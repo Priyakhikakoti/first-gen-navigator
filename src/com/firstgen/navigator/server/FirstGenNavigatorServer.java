@@ -22,7 +22,16 @@ import java.util.concurrent.Executors;
  */
 public class FirstGenNavigatorServer {
 
-    private static final int PORT = 8080;
+    private static int getPort() {
+        String envPort = System.getenv("PORT");
+        if (envPort != null && !envPort.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(envPort.trim());
+            } catch (NumberFormatException ignored) {}
+        }
+        return 8080;
+    }
+
     private final DataStore dataStore;
     private final AffordabilityCalculator affordabilityCalculator;
     private final CollegeMatcher collegeMatcher;
@@ -52,7 +61,8 @@ public class FirstGenNavigatorServer {
     }
 
     public void start() throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
+        int port = getPort();
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.setExecutor(Executors.newFixedThreadPool(16));
 
         // REST API endpoints
@@ -74,9 +84,9 @@ public class FirstGenNavigatorServer {
 
         server.start();
         System.out.println("=========================================================");
-        System.out.println("  FIRST GEN NAVIGATOR — AI Education Guidance Server");
-        System.out.println("  Status: RUNNING at http://localhost:" + PORT);
-        System.out.println("  Access Web Interface: http://localhost:" + PORT);
+        System.out.println("  FIRST GEN NAVIGATOR — Higher Education Guidance Server");
+        System.out.println("  Status: RUNNING at port " + port);
+        System.out.println("  Access Web Interface: http://localhost:" + port);
         System.out.println("=========================================================");
     }
 
