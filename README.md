@@ -1,6 +1,12 @@
 # First Gen Navigator
 
-> **AI-powered higher education advisory and financial feasibility platform designed specifically for first-generation college students in India.**
+> **Higher education advisory and financial feasibility platform designed specifically for first-generation college students in India.**
+
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Render-00c7b7?style=for-the-badge&logo=render&logoColor=white)](https://first-gen-navigator.onrender.com)
+[![Deployment Status](https://img.shields.io/badge/Status-Live-success?style=for-the-badge)](https://first-gen-navigator.onrender.com)
+[![Java](https://img.shields.io/badge/Java-JDK_21%2B-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
+
+🌐 **Live Deployed Web Application**: **[https://first-gen-navigator.onrender.com](https://first-gen-navigator.onrender.com)**
 
 First Gen Navigator bridges information asymmetry by converting scattered counselling cutoffs, state quota rules, and complex fee structures into one clear, actionable, and affordable roadmap.
 
@@ -181,10 +187,8 @@ Output:
 ```
 
 ### 4. Access the Platform
-Open your browser and navigate to:
-```
-http://localhost:8080
-```
+- **Live Production URL**: **[https://first-gen-navigator.onrender.com](https://first-gen-navigator.onrender.com)**
+- **Local Development**: `http://localhost:8080`
 
 ---
 
