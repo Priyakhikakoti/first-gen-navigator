@@ -1,11 +1,19 @@
-.env
+﻿.env
 node_modules/
 server.log
 server.err
 .agents/
 
-# Backend / server files - keep out of repo
-java-app/
+# Compiled Java output - never commit these
+java-app/target/
+*.class
+
+# Web frontend (not part of this Java app)
+index.html
+styles.css
+client.js
+
+# Server/API files
 api/
 lib/
 scripts/
@@ -14,4 +22,3 @@ test-server.bat
 .env.example
 package.json
 vercel.json
-
