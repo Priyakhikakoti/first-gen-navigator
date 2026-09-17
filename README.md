@@ -1,6 +1,6 @@
 # First Gen Navigator
 
-> **Higher education advisory and financial feasibility platform designed specifically for first-generation college students in India.**
+**Higher education advisory and financial feasibility platform designed specifically for first-generation college students in India.**
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Render-00c7b7?style=for-the-badge&logo=render&logoColor=white)](https://first-gen-navigator.onrender.com)
 [![Deployment Status](https://img.shields.io/badge/Status-Live-success?style=for-the-badge)](https://first-gen-navigator.onrender.com)
