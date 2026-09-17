@@ -17,3 +17,13 @@ Desktop.ini
 
 # Temporary logs
 *.log
+
+# Anakin API Key - never commit
+.env
+
+# Node
+node_modules/
+scraper/scraped-data.json
+scraper/enriched-data.json
+scraper/test-sdk.js
+
