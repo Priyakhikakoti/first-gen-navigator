@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>First Gen Navigator — Higher Education Advisory for First-Generation Students</title>
+  <meta name="description" content="Official academic guidance platform: college cutoffs, state quota matching, scholarship eligibility, and document management for first-generation Indian students." />
+  
+  <!-- Modern Typography: Plus Jakarta Sans & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <!-- Auth Status Bar -->
+  <div class="auth-status-bar" id="authStatusBar">
+    <div class="container auth-bar-inner">
+      <div class="auth-bar-left">
+        <span class="auth-indicator" id="authIndicatorDot"></span>
+        <span id="authStatusText">Not signed in — your data is stored locally only.</span>
+      </div>
+      <div class="auth-bar-right">
+        <button class="auth-btn-outline" id="btnOpenLogin">Sign In</button>
+        <button class="auth-btn-primary" id="btnOpenSignup">Create Account</button>
+        <button class="auth-btn-signout" id="btnSignOut" style="display:none;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Global Announcement & Trust Bar -->
+  <div class="top-announcement">
+    <div class="container announcement-inner">
+      <span class="announcement-badge">Advisory Notice</span>
+      <span class="announcement-text" id="t-announcement">Institutional guidance for first-generation students navigating JoSAA, CSAB, state domicile quotas, and scholarships.</span>
+      <div class="lang-selector-wrap">
+        <label for="langSelect" class="lang-label">Language:</label>
+        <select id="langSelect" class="lang-dropdown">
+          <option value="en" selected>English</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+          <option value="bn">বাংলা (Bengali)</option>
+          <option value="as">অসমীয়া (Assamese)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Primary Header -->
+  <header class="site-header">
+    <div class="container header-content">
+      <div class="brand">
+        <div class="brand-symbol">FGN</div>
+        <div class="brand-text">
+          <span class="brand-title">FIRST GEN NAVIGATOR</span>
+          <span class="brand-sub" id="t-tagline">Your path to college, simplified.</span>
+        </div>
+      </div>
+      <nav class="main-nav">
+        <a href="#profile-section" class="nav-link" id="nav-profile">Profile</a>
+        <a href="#colleges-section" class="nav-link" id="nav-colleges">Colleges</a>
+        <a href="#scholarships-section" class="nav-link" id="nav-scholarships">Scholarships</a>
+        <a href="#calculator-section" class="nav-link" id="nav-calculator">Affordability</a>
+        <a href="#alternatives-section" class="nav-link" id="nav-alternatives">Pathways</a>
+        <a href="#documents-section" class="nav-link" id="nav-documents">Documents</a>
+        <a href="#deadlines-section" class="nav-link" id="nav-deadlines">Deadlines</a>
+        <a href="#progress-section" class="nav-link" id="nav-progress">My Progress</a>
+      </nav>
+      <div class="header-cta">
+        <button id="btnQuickRecalc" class="btn-secondary-sm">Refresh Matches</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="hero-section">
+    <div class="container">
+      <div class="hero-grid">
+        <div class="hero-main">
+          <div class="hero-pill" id="heroPill">
+            <span class="pulse-dot"></span> <span id="heroPillText">Active Student: Asha Kumar (Jharkhand)</span>
+          </div>
+          <h1 class="hero-heading" id="t-heroHeading">Turn scattered college cutoffs and fee structures into one clear, affordable path.</h1>
+          <p class="hero-subtext" id="t-subtagline">
+            We calculate the real out-of-pocket cost of education (Tuition + Hostel − Scholarship), identify safe versus dream institutions, and guide you through quota verifications.
+          </p>
+          <div class="hero-quick-presets">
+            <span class="preset-label">Sample Student Profiles:</span>
+            <button class="preset-chip active" id="btnPresetAsha">Asha Kumar (Jharkhand, 92%ile, OBC)</button>
+            <button class="preset-chip" id="btnPresetRahul">Rahul Verma (UP, 97%ile, GEN)</button>
+            <button class="preset-chip" id="btnPresetPriya">Priya Soren (Jharkhand, 78%ile, ST)</button>
+          </div>
+        </div>
+        <div class="hero-stats-card">
+          <div class="stat-item">
+            <div class="stat-number" id="statCollegesCount">10</div>
+            <div class="stat-title">Target Colleges</div>
+            <div class="stat-desc">Classified into Dream, Realistic, and Safe tiers</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number stat-green" id="statScholarshipMax">₹50,000</div>
+            <div class="stat-title">Top Eligible Grant</div>
+            <div class="stat-desc" id="statScholarshipName">e-Kalyan Post-Matric OBC</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number" id="statDocsReady">5 / 7</div>
+            <div class="stat-title">Document Vault Readiness</div>
+            <div class="stat-desc" id="statDocsStatus">2 critical documents pending</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 1: Student Profile -->
+  <section id="profile-section" class="section-wrapper bg-white">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Step 1</div>
+        <h2 class="section-title">Student Profile & Academic Context</h2>
+        <p class="section-subtitle">Your score, state domicile, reservation category, and budget directly determine quota benefits and fee remission eligibility.</p>
+      </div>
+
+      <form id="profileForm" class="profile-card">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="inputName">Full Name</label>
+            <input type="text" id="inputName" required placeholder="e.g. Asha Kumar" />
+          </div>
+
+          <div class="form-group">
+            <label for="inputPercentile">JEE Main Percentile (0 – 100)</label>
+            <div class="input-with-display">
+              <input type="number" id="inputPercentile" min="0" max="100" step="0.1" required />
+              <span class="input-suffix">%ile</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="inputCategory">Reservation Category</label>
+            <select id="inputCategory" required>
+              <option value="GEN">General (Open)</option>
+              <option value="OBC-NCL">OBC-NCL (Non-Creamy Layer)</option>
+              <option value="EWS">Economically Weaker Section (EWS)</option>
+              <option value="SC">Scheduled Caste (SC)</option>
+              <option value="ST">Scheduled Tribe (ST)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="inputState">Home State (Domicile)</label>
+            <select id="inputState" required>
+              <option value="Jharkhand">Jharkhand</option>
+              <option value="Bihar">Bihar</option>
+              <option value="Uttar Pradesh">Uttar Pradesh</option>
+              <option value="West Bengal">West Bengal</option>
+              <option value="Assam">Assam</option>
+              <option value="Delhi">Delhi</option>
+              <option value="Maharashtra">Maharashtra</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="inputBranch">Preferred Engineering Branch</label>
+            <select id="inputBranch" required>
+              <option value="CSE">Computer Science & Engineering (CSE)</option>
+              <option value="IT">Information Technology (IT)</option>
+              <option value="ECE">Electronics & Communication (ECE)</option>
+              <option value="ME">Mechanical Engineering (ME)</option>
+              <option value="EE">Electrical Engineering (EE)</option>
+              <option value="CE">Civil Engineering (CE)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="inputIncome">Annual Family Income (₹)</label>
+            <input type="number" id="inputIncome" step="10000" min="0" required />
+            <small class="field-hint" id="incomeHint">Required for TFW fee waiver and post-matric government scholarships</small>
+          </div>
+
+          <div class="form-group">
+            <label for="inputBudget">Maximum Annual Education Budget (₹)</label>
+            <input type="number" id="inputBudget" step="10000" min="0" required />
+            <small class="field-hint">Include both academic tuition and hostel/mess expenses</small>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button type="submit" id="btnSaveProfile" class="btn-primary">
+            Update Profile & Recalculate
+          </button>
+          <span class="save-status" id="profileSaveStatus"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Section 2: College Options (Dream, Realistic, Safe) -->
+  <section id="colleges-section" class="section-wrapper bg-soft">
+    <div class="container">
+      <div class="section-header flex-between">
+        <div>
+          <div class="section-badge">Step 2</div>
+          <h2 class="section-title">Institutional Matches</h2>
+          <p class="section-subtitle" id="collegesSubtext">Classified using past closing ranks, category relaxations, and home-state quota advantages.</p>
+        </div>
+        <!-- Tier Navigation Tabs -->
+        <div class="tier-tabs">
+          <button class="tier-tab active" data-tier="realistic" id="tabRealistic">
+            Realistic Target <span class="tab-count" id="countRealistic">0</span>
+          </button>
+          <button class="tier-tab" data-tier="dream" id="tabDream">
+            Dream Reach <span class="tab-count" id="countDream">0</span>
+          </button>
+          <button class="tier-tab" data-tier="safe" id="tabSafe">
+            Safe Backup <span class="tab-count" id="countSafe">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Explanatory Tip Banner -->
+      <div class="info-alert-banner" id="tierTipBanner">
+        <span id="tierTipText">Realistic colleges are your prime target matches where your rank has a very strong admission probability.</span>
+      </div>
+
+      <!-- College Cards Container -->
+      <div class="college-cards-grid" id="collegeCardsGrid">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 3: Scholarships & Eligibility Explanations -->
+  <section id="scholarships-section" class="section-wrapper bg-white">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Step 3</div>
+        <h2 class="section-title">Scholarships & Fee Remissions</h2>
+        <p class="section-subtitle">Transparent criterion-by-criterion assessment detailing income ceilings, category rules, and required certificates.</p>
+      </div>
+
+      <div class="scholarship-cards-grid" id="scholarshipCardsGrid">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4: Smart Affordability Calculator -->
+  <section id="calculator-section" class="section-wrapper bg-soft">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Step 4</div>
+        <h2 class="section-title">Net Affordability Calculator</h2>
+        <p class="section-subtitle">Estimated Net Cost = Annual Tuition + Hostel and Mess − Applicable Scholarships.</p>
+      </div>
+
+      <div class="calculator-card">
+        <div class="calculator-controls">
+          <div class="calc-control-group">
+            <label for="calcCollegeSelect">Select Institution to Evaluate:</label>
+            <select id="calcCollegeSelect" class="calc-select">
+              <!-- Options populated dynamically -->
+            </select>
+          </div>
+          <div class="calc-control-group">
+            <label for="calcCustomScholarship">Applied Scholarship Relief (₹/year):</label>
+            <div class="input-with-display">
+              <input type="number" id="calcCustomScholarship" step="5000" min="0" value="50000" />
+              <span class="input-suffix">₹</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="calculator-breakdown-grid">
+          <div class="cost-pillar">
+            <div class="pillar-label">Annual Tuition Fee</div>
+            <div class="pillar-value" id="calcTuition">₹0</div>
+            <div class="pillar-sub" id="calcTfwNote">Base Academic Fee</div>
+          </div>
+          <div class="cost-operator">+</div>
+          <div class="cost-pillar">
+            <div class="pillar-label">Hostel & Living</div>
+            <div class="pillar-value" id="calcHostel">₹0</div>
+            <div class="pillar-sub">Room and Mandatory Mess</div>
+          </div>
+          <div class="cost-operator">−</div>
+          <div class="cost-pillar pillar-relief">
+            <div class="pillar-label">Scholarship Relief</div>
+            <div class="pillar-value" id="calcScholarship">₹0</div>
+            <div class="pillar-sub">State / Central Subsidy</div>
+          </div>
+          <div class="cost-operator">=</div>
+          <div class="cost-pillar pillar-net">
+            <div class="pillar-label">Estimated Net Cost</div>
+            <div class="pillar-value-net" id="calcNetCost">₹0</div>
+            <div class="pillar-badge" id="calcAffordabilityBadge">Affordable</div>
+          </div>
+        </div>
+
+        <div class="budget-comparison-bar-wrap">
+          <div class="budget-bar-labels">
+            <span>Net Out-of-Pocket: <strong id="barNetText">₹0</strong></span>
+            <span>Your Stated Budget: <strong id="barBudgetText">₹0</strong></span>
+          </div>
+          <div class="budget-bar-track">
+            <div class="budget-bar-fill" id="budgetBarFill" style="width: 50%;"></div>
+          </div>
+          <div class="budget-verdict-note" id="calcExplanationText">
+            The estimated net annual expense fits within your family's annual education budget.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 5: Alternative Pathways (Plan A / B / C) -->
+  <section id="alternatives-section" class="section-wrapper bg-white">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Step 5</div>
+        <h2 class="section-title">Strategic Alternative Pathways</h2>
+        <p class="section-subtitle">If top-choice branches have stringent cutoffs, these pathways optimize branch-versus-college trade-offs.</p>
+      </div>
+
+      <div class="pathways-diagnostic-box" id="pathwaysDiagnostic">
+        <div id="pathwaysDiagnosticText">Analyzing alternatives...</div>
+      </div>
+
+      <div class="pathways-grid" id="pathwaysGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 6: Document Readiness Vault -->
+  <section id="documents-section" class="section-wrapper bg-soft">
+    <div class="container">
+      <div class="section-header flex-between">
+        <div>
+          <div class="section-badge">Step 6</div>
+          <h2 class="section-title">Document Readiness Vault</h2>
+          <p class="section-subtitle">Upload and track government-issued certificates required for seat allocation and fee waivers.</p>
+        </div>
+        <div class="vault-header-actions">
+          <div class="vault-score-badge" id="vaultScoreBadge">
+            <span id="vaultScoreText">5 of 7 Ready</span>
+          </div>
+          <button id="btnOpenUploadModalNew" class="btn-primary-sm">+ Upload Document</button>
+        </div>
+      </div>
+
+      <div class="vault-upload-banner">
+        <div class="vault-upload-banner-text">
+          <strong>Document Submission Center:</strong> Select any document card below to upload or update your verified PDF / DigiLocker certificates, or click <strong>+ Upload Document</strong> to add additional documentation.
+        </div>
+      </div>
+
+      <div class="documents-grid" id="documentsGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 7: Deadlines & Action Roadmap -->
+  <section id="deadlines-section" class="section-wrapper bg-white">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Step 7</div>
+        <h2 class="section-title">Admission Deadlines & Action Roadmap</h2>
+        <p class="section-subtitle">Timeline monitoring for preference locking, document verification windows, and scholarship portals.</p>
+      </div>
+
+      <div class="roadmap-and-deadlines-grid">
+        <!-- Deadlines Column -->
+        <div class="deadlines-col">
+          <h3 class="col-title">Upcoming Deadlines</h3>
+          <div class="deadlines-list" id="deadlinesList">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Dynamic Roadmap Column -->
+        <div class="roadmap-col">
+          <h3 class="col-title">Milestone Roadmap</h3>
+          <div class="roadmap-timeline" id="roadmapTimeline">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 8: My Admission Progress (Supabase-backed) -->
+  <section id="progress-section" class="section-wrapper bg-soft">
+    <div class="container">
+      <div class="section-header flex-between">
+        <div>
+          <div class="section-badge">My Progress</div>
+          <h2 class="section-title">Admission Progress Dashboard</h2>
+          <p class="section-subtitle">Track your key milestones. Sign in to save progress across devices.</p>
+        </div>
+        <div id="progressLoginPrompt" class="progress-login-cta" style="display:none;">
+          <button class="btn-primary" onclick="document.getElementById('authModal').classList.add('open');">Sign In to Save Progress</button>
+        </div>
+      </div>
+      <div class="progress-steps-grid" id="progressStepsGrid">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div class="footer-info">
+        <div class="footer-logo">FIRST GEN NAVIGATOR</div>
+        <p class="footer-tag">Independent academic guidance platform for first-generation Indian students. Cutoffs and fees verified against official counselling records.</p>
+      </div>
+      <div class="footer-links">
+        <span class="footer-note">Java Backend (JDK 26) with REST Architecture</span>
+        <span class="footer-copyright">First Gen Navigator. Academic Advisory Service.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal: Why This Match? Explanation -->
+  <div class="modal-backdrop" id="whyMatchModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="modalCollegeName">Match Evaluation</h3>
+        </div>
+        <button class="modal-close" id="btnCloseWhyMatchModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="ai-reasoning-content" id="modalAiReasoning">
+          Generating match evaluation...
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary-sm" id="btnCloseWhyMatchBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Document Upload & Verification -->
+  <div class="modal-backdrop" id="uploadDocModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="uploadModalTitle">Upload Document</h3>
+        </div>
+        <button class="modal-close" id="btnCloseUploadModal">&times;</button>
+      </div>
+      <form id="uploadDocForm" class="modal-body">
+        <div class="form-group">
+          <label for="uploadDocTypeSelect">Document Type</label>
+          <select id="uploadDocTypeSelect" class="form-group select">
+            <option value="Aadhaar">Aadhaar Card</option>
+            <option value="Income Certificate">Annual Family Income Certificate (Tehsildar/SDO)</option>
+            <option value="Domicile Certificate">State Domicile / Residential Certificate</option>
+            <option value="Caste Certificate">Caste / Category Certificate (OBC/EWS/SC/ST)</option>
+            <option value="JEE Scorecard">JEE Main Official Scorecard</option>
+            <option value="Class 12 Marksheet">Class 12 Board Marksheet & Certificate</option>
+            <option value="Bank Details">Bank Passbook / Cancelled Cheque</option>
+            <option value="Other">Other Institutional Verification Certificate</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="customDocTypeGroup" style="display: none;">
+          <label for="customDocTypeName">Specify Certificate Name</label>
+          <input type="text" id="customDocTypeName" placeholder="e.g. Disability Certificate, Character Certificate" />
+        </div>
+
+        <div class="form-group">
+          <label for="realFileInput">Select Certificate File</label>
+          <input type="file" id="realFileInput" accept=".pdf,.jpg,.jpeg,.png" style="padding: 0.4rem; background: var(--color-slate-100);" />
+          <small class="field-hint">Accepted file formats: PDF, JPG, PNG (Max 5MB)</small>
+        </div>
+
+        <div class="form-group">
+          <label for="uploadFileName">Recorded Certificate File Name</label>
+          <input type="text" id="uploadFileName" required placeholder="e.g. income_certificate_2026.pdf" />
+        </div>
+      </form>
+      <div class="modal-footer">
+        <button class="btn-secondary-sm" id="btnCancelUpload">Cancel</button>
+        <button class="btn-primary-sm" id="btnConfirmUpload">Save and Verify Document</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Auth Modal: Login / Signup -->
+  <div class="modal-backdrop" id="authModal">
+    <div class="modal-dialog auth-modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="authModalTitle">Sign In to First Gen Navigator</h3>
+          <p class="auth-modal-sub" id="authModalSub">Your progress, profile, and documents saved securely.</p>
+        </div>
+        <button class="modal-close" id="btnCloseAuthModal">&times;</button>
+      </div>
+      <div class="modal-body auth-modal-body">
+        <!-- Tab Toggle -->
+        <div class="auth-tab-toggle">
+          <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</button>
+          <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form">
+          <div class="form-group">
+            <label for="loginEmail">Email Address</label>
+            <input type="email" id="loginEmail" required placeholder="your@email.com" />
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" required placeholder="Your password" />
+          </div>
+          <div class="auth-error" id="loginError" style="display:none;"></div>
+          <button type="submit" class="btn-primary auth-submit-btn" id="btnLogin">Sign In &rarr;</button>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signupForm" class="auth-form" style="display:none;">
+          <div class="form-group">
+            <label for="signupName">Full Name</label>
+            <input type="text" id="signupName" required placeholder="e.g. Asha Kumar" />
+          </div>
+          <div class="form-group">
+            <label for="signupEmail">Email Address</label>
+            <input type="email" id="signupEmail" required placeholder="your@email.com" />
+          </div>
+          <div class="form-group">
+            <label for="signupPassword">Password (min. 6 characters)</label>
+            <input type="password" id="signupPassword" required minlength="6" placeholder="Create a password" />
+          </div>
+          <div class="auth-error" id="signupError" style="display:none;"></div>
+          <button type="submit" class="btn-primary auth-submit-btn" id="btnSignup">Create Account &rarr;</button>
+        </form>
+
+        <div class="auth-divider">
+          <span>Your data is encrypted and stored securely on Supabase.</span>
+        </div>
+
+        <div class="auth-benefits">
+          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Profile saved across all devices</div>
+          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Document vault persisted securely</div>
+          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Admission progress tracked &amp; synced</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="supabase-client.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
