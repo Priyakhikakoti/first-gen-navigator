@@ -1,0 +1,26 @@
+﻿{
+  "name": "first-gen-navigator",
+  "version": "1.0.0",
+  "description": "Higher education advisory platform for first-generation Indian students — powered by Anakin web scraping.",
+  "type": "module",
+  "main": "scraper/proxy-server.js",
+  "scripts": {
+    "scrape": "node scraper/anakin-scraper.js",
+    "serve": "node scraper/proxy-server.js",
+    "dev": "node scraper/proxy-server.js",
+    "test": "echo No tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Priyakhikakoti/first-gen-navigator.git"
+  },
+  "keywords": ["jee", "nit", "scholarship", "first-generation", "india"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anakin-io/sdk": "^0.1.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
