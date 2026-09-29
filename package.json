@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "first-gen-navigator",
   "version": "1.0.0",
   "description": "Higher education advisory platform for first-generation Indian students — powered by Anakin web scraping.",
@@ -14,11 +14,18 @@
     "type": "git",
     "url": "git+https://github.com/Priyakhikakoti/first-gen-navigator.git"
   },
-  "keywords": ["jee", "nit", "scholarship", "first-generation", "india"],
+  "keywords": [
+    "jee",
+    "nit",
+    "scholarship",
+    "first-generation",
+    "india"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@anakin-io/sdk": "^0.1.0",
+    "@supabase/supabase-js": "^2.117.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"

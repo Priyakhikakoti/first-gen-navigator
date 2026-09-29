@@ -12,8 +12,25 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
   
   <link rel="stylesheet" href="styles.css" />
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
+  <!-- Auth Status Bar -->
+  <div class="auth-status-bar" id="authStatusBar">
+    <div class="container auth-bar-inner">
+      <div class="auth-bar-left">
+        <span class="auth-indicator" id="authIndicatorDot"></span>
+        <span id="authStatusText">Not signed in — your data is stored locally only.</span>
+      </div>
+      <div class="auth-bar-right">
+        <button class="auth-btn-outline" id="btnOpenLogin">Sign In</button>
+        <button class="auth-btn-primary" id="btnOpenSignup">Create Account</button>
+        <button class="auth-btn-signout" id="btnSignOut" style="display:none;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Top Global Announcement & Trust Bar -->
   <div class="top-announcement">
     <div class="container announcement-inner">
@@ -49,6 +66,7 @@
         <a href="#alternatives-section" class="nav-link" id="nav-alternatives">Pathways</a>
         <a href="#documents-section" class="nav-link" id="nav-documents">Documents</a>
         <a href="#deadlines-section" class="nav-link" id="nav-deadlines">Deadlines</a>
+        <a href="#progress-section" class="nav-link" id="nav-progress">My Progress</a>
       </nav>
       <div class="header-cta">
         <button id="btnQuickRecalc" class="btn-secondary-sm">Refresh Matches</button>
@@ -374,6 +392,25 @@
     </div>
   </section>
 
+  <!-- Section 8: My Admission Progress (Supabase-backed) -->
+  <section id="progress-section" class="section-wrapper bg-soft">
+    <div class="container">
+      <div class="section-header flex-between">
+        <div>
+          <div class="section-badge">My Progress</div>
+          <h2 class="section-title">Admission Progress Dashboard</h2>
+          <p class="section-subtitle">Track your key milestones. Sign in to save progress across devices.</p>
+        </div>
+        <div id="progressLoginPrompt" class="progress-login-cta" style="display:none;">
+          <button class="btn-primary" onclick="document.getElementById('authModal').classList.add('open');">Sign In to Save Progress</button>
+        </div>
+      </div>
+      <div class="progress-steps-grid" id="progressStepsGrid">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+  </section>
+
   <!-- Footer -->
   <footer class="site-footer">
     <div class="container footer-content">
@@ -458,6 +495,69 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Auth Modal: Login / Signup -->
+  <div class="modal-backdrop" id="authModal">
+    <div class="modal-dialog auth-modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="authModalTitle">Sign In to First Gen Navigator</h3>
+          <p class="auth-modal-sub" id="authModalSub">Your progress, profile, and documents saved securely.</p>
+        </div>
+        <button class="modal-close" id="btnCloseAuthModal">&times;</button>
+      </div>
+      <div class="modal-body auth-modal-body">
+        <!-- Tab Toggle -->
+        <div class="auth-tab-toggle">
+          <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</button>
+          <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="auth-form">
+          <div class="form-group">
+            <label for="loginEmail">Email Address</label>
+            <input type="email" id="loginEmail" required placeholder="your@email.com" />
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" required placeholder="Your password" />
+          </div>
+          <div class="auth-error" id="loginError" style="display:none;"></div>
+          <button type="submit" class="btn-primary auth-submit-btn" id="btnLogin">Sign In &rarr;</button>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signupForm" class="auth-form" style="display:none;">
+          <div class="form-group">
+            <label for="signupName">Full Name</label>
+            <input type="text" id="signupName" required placeholder="e.g. Asha Kumar" />
+          </div>
+          <div class="form-group">
+            <label for="signupEmail">Email Address</label>
+            <input type="email" id="signupEmail" required placeholder="your@email.com" />
+          </div>
+          <div class="form-group">
+            <label for="signupPassword">Password (min. 6 characters)</label>
+            <input type="password" id="signupPassword" required minlength="6" placeholder="Create a password" />
+          </div>
+          <div class="auth-error" id="signupError" style="display:none;"></div>
+          <button type="submit" class="btn-primary auth-submit-btn" id="btnSignup">Create Account &rarr;</button>
+        </form>
+
+        <div class="auth-divider">
+          <span>Your data is encrypted and stored securely on Supabase.</span>
+        </div>
+
+        <div class="auth-benefits">
+          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Profile saved across all devices</div>
+          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Document vault persisted securely</div>
+          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Admission progress tracked &amp; synced</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="supabase-client.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

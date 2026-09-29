@@ -15,7 +15,9 @@ const state = {
   roadmap: [],
   currentTier: 'REALISTIC',
   currentLang: 'en',
-  translations: {}
+  translations: {},
+  currentUser: null,   // Supabase user
+  authReady: false     // true once Supabase session has been checked
 };
 
 // Formatting helpers
@@ -37,11 +39,173 @@ function showToast(message) {
   }, 3500);
 }
 
+// ─── Auth UI ──────────────────────────────────────────────────────────────────
+
+function updateAuthUI(user) {
+  state.currentUser = user;
+  const dot = document.getElementById('authIndicatorDot');
+  const statusText = document.getElementById('authStatusText');
+  const btnLogin = document.getElementById('btnOpenLogin');
+  const btnSignup = document.getElementById('btnOpenSignup');
+  const btnSignOut = document.getElementById('btnSignOut');
+  const progressPrompt = document.getElementById('progressLoginPrompt');
+
+  if (user) {
+    if (dot) dot.classList.add('logged-in');
+    if (statusText) statusText.textContent = `Signed in as ${user.user_metadata?.full_name || user.email} — data synced to cloud.`;
+    if (btnLogin) btnLogin.style.display = 'none';
+    if (btnSignup) btnSignup.style.display = 'none';
+    if (btnSignOut) btnSignOut.style.display = '';
+    if (progressPrompt) progressPrompt.style.display = 'none';
+  } else {
+    if (dot) dot.classList.remove('logged-in');
+    if (statusText) statusText.textContent = 'Not signed in — your data is stored locally only.';
+    if (btnLogin) btnLogin.style.display = '';
+    if (btnSignup) btnSignup.style.display = '';
+    if (btnSignOut) btnSignOut.style.display = 'none';
+    if (progressPrompt) progressPrompt.style.display = '';
+  }
+}
+
+window.switchAuthTab = function(tab) {
+  const loginForm = document.getElementById('loginForm');
+  const signupForm = document.getElementById('signupForm');
+  const tabLogin = document.getElementById('tabLogin');
+  const tabSignup = document.getElementById('tabSignup');
+  if (tab === 'login') {
+    if (loginForm) loginForm.style.display = '';
+    if (signupForm) signupForm.style.display = 'none';
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabSignup) tabSignup.classList.remove('active');
+  } else {
+    if (loginForm) loginForm.style.display = 'none';
+    if (signupForm) signupForm.style.display = '';
+    if (tabLogin) tabLogin.classList.remove('active');
+    if (tabSignup) tabSignup.classList.add('active');
+  }
+};
+
+// ─── Progress Dashboard (Supabase-backed) ─────────────────────────────────────
+
+const DEFAULT_STEPS = [
+  { step: 1, stepId: 'RESULTS',    title: 'JEE Main Results & Score Analysis',            description: 'Review official scorecard from NTA portal.', month: 'Apr 2025', completed: true  },
+  { step: 2, stepId: 'DOCS',       title: 'Category Certificate & Income Document Prep',  description: 'Obtain caste, income, domicile certificates.', month: 'May 2025', completed: true  },
+  { step: 3, stepId: 'JOSAA',      title: 'JoSAA Choice Filling — Rounds 1–6',            description: 'Fill choices on josaa.admissions.nic.in.', month: 'Jun 2025', completed: false },
+  { step: 4, stepId: 'CSAB',       title: 'CSAB Special Round Participation',             description: 'Register on csab.nic.in if needed.', month: 'Aug 2025', completed: false },
+  { step: 5, stepId: 'SCHOLARSHIP', title: 'Apply for NSP / e-Kalyan Scholarship',        description: 'Apply on scholarships.gov.in / ekalyan.', month: 'Sep 2025', completed: false },
+  { step: 6, stepId: 'COLLEGE',    title: 'College Document Reporting & Admission',       description: 'Report to allotted college with originals.', month: 'Nov 2025', completed: false },
+];
+
+async function loadProgress() {
+  const container = document.getElementById('progressStepsGrid');
+  if (!container) return;
+
+  let steps = DEFAULT_STEPS.map(s => ({ ...s }));
+
+  if (state.currentUser) {
+    const { data } = await window.FGNDB.getProgress(state.currentUser.id);
+    if (data && data.length > 0) {
+      const map = {};
+      data.forEach(r => { map[r.step_id] = r.completed; });
+      steps = steps.map(s => ({ ...s, completed: map[s.stepId] !== undefined ? map[s.stepId] : s.completed }));
+    }
+  }
+
+  container.innerHTML = '';
+  steps.forEach((step, idx) => {
+    const card = document.createElement('div');
+    const isActive = !step.completed && (idx === 0 || steps[idx - 1].completed);
+    card.className = `progress-step-card${step.completed ? ' completed' : (isActive ? ' active' : '')}`;
+    card.dataset.stepId = step.stepId;
+    card.innerHTML = `
+      <div class="step-checkbox">${step.completed ? '&#10003;' : (isActive ? '&#9654;' : step.step)}</div>
+      <div class="step-info">
+        <div class="step-card-title">${step.title}</div>
+        <div class="step-card-desc">${step.description}</div>
+        <div class="step-card-month">${step.month}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => toggleProgressStep(step, card, steps));
+    container.appendChild(card);
+  });
+}
+
+async function toggleProgressStep(step, card, steps) {
+  if (!state.currentUser) {
+    document.getElementById('authModal').classList.add('open');
+    showToast('Sign in to save your progress across devices.');
+    return;
+  }
+  const newVal = !step.completed;
+  step.completed = newVal;
+  await window.FGNDB.updateProgress(state.currentUser.id, step.stepId, newVal);
+  await loadProgress(); // re-render
+}
+
+// ─── Supabase Profile Sync ────────────────────────────────────────────────────
+
+async function syncProfileFromSupabase() {
+  if (!state.currentUser) return;
+  const { data, error } = await window.FGNDB.getProfile(state.currentUser.id);
+  if (data && !error) {
+    const profileFromDB = {
+      name: data.name,
+      jeePercentile: data.jee_percentile,
+      category: data.category,
+      state: data.state,
+      preferredBranch: data.preferred_branch,
+      annualIncome: data.annual_income,
+      annualBudget: data.annual_budget
+    };
+    state.student = profileFromDB;
+    populateProfileForm(profileFromDB);
+    updateHeroSummary(profileFromDB);
+  }
+}
+
+async function syncDocumentsFromSupabase() {
+  if (!state.currentUser || !state.documentsData) return;
+  const { data, error } = await window.FGNDB.getDocuments(state.currentUser.id);
+  if (data && !error && data.length > 0) {
+    // Merge DB documents into vault
+    const dbMap = {};
+    data.forEach(d => { dbMap[d.document_type.toLowerCase()] = d; });
+
+    if (state.documentsData.documents) {
+      state.documentsData.documents.forEach(doc => {
+        const dbDoc = dbMap[doc.documentType.toLowerCase()];
+        if (dbDoc) {
+          doc.fileName = dbDoc.file_name;
+          doc.status = dbDoc.status;
+        }
+      });
+    }
+    renderDocuments();
+  }
+}
+
 // Initial Boot
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
+  setupAuthListeners();
+
+  // Check existing session
+  const session = await window.FGNAuth.getSession();
+  const user = session?.user ?? null;
+  updateAuthUI(user);
+  state.authReady = true;
+
   await loadAllData();
+
+  // If signed in, sync cloud data
+  if (user) {
+    await syncProfileFromSupabase();
+    await syncDocumentsFromSupabase();
+  }
+  await loadProgress();
 });
+
+
 
 function setupEventListeners() {
   // Navigation
@@ -175,7 +339,113 @@ function setupEventListeners() {
   }
 }
 
+// ─── Auth Event Listeners ─────────────────────────────────────────────────────
+
+function setupAuthListeners() {
+  // Open auth modal
+  const btnOpenLogin = document.getElementById('btnOpenLogin');
+  if (btnOpenLogin) btnOpenLogin.addEventListener('click', () => {
+    switchAuthTab('login');
+    document.getElementById('authModal').classList.add('open');
+  });
+  const btnOpenSignup = document.getElementById('btnOpenSignup');
+  if (btnOpenSignup) btnOpenSignup.addEventListener('click', () => {
+    switchAuthTab('signup');
+    document.getElementById('authModal').classList.add('open');
+  });
+
+  // Close auth modal
+  const btnCloseAuth = document.getElementById('btnCloseAuthModal');
+  if (btnCloseAuth) btnCloseAuth.addEventListener('click', () => {
+    document.getElementById('authModal').classList.remove('open');
+  });
+
+  // Login form
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      const errEl = document.getElementById('loginError');
+      const btn = document.getElementById('btnLogin');
+      if (btn) btn.textContent = 'Signing in...';
+      if (errEl) errEl.style.display = 'none';
+
+      const { data, error } = await window.FGNAuth.signIn(email, password);
+      if (btn) btn.textContent = 'Sign In →';
+      if (error) {
+        if (errEl) { errEl.textContent = error.message; errEl.style.display = ''; }
+      } else {
+        document.getElementById('authModal').classList.remove('open');
+        updateAuthUI(data.user);
+        showToast(`Welcome back, ${data.user.user_metadata?.full_name || data.user.email}!`);
+        await syncProfileFromSupabase();
+        await syncDocumentsFromSupabase();
+        await loadProgress();
+      }
+    });
+  }
+
+  // Signup form
+  const signupForm = document.getElementById('signupForm');
+  if (signupForm) {
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('signupName').value;
+      const email = document.getElementById('signupEmail').value;
+      const password = document.getElementById('signupPassword').value;
+      const errEl = document.getElementById('signupError');
+      const btn = document.getElementById('btnSignup');
+      if (btn) btn.textContent = 'Creating account...';
+      if (errEl) errEl.style.display = 'none';
+
+      const { data, error } = await window.FGNAuth.signUp(email, password, name);
+      if (btn) btn.textContent = 'Create Account →';
+      if (error) {
+        if (errEl) { errEl.textContent = error.message; errEl.style.display = ''; }
+      } else {
+        document.getElementById('authModal').classList.remove('open');
+        // If email confirmation required
+        if (data.session) {
+          updateAuthUI(data.user);
+          showToast(`Account created! Welcome, ${name}!`);
+          await loadProgress();
+        } else {
+          showToast('Account created! Please check your email to confirm.');
+        }
+      }
+    });
+  }
+
+  // Sign out
+  const btnSignOut = document.getElementById('btnSignOut');
+  if (btnSignOut) {
+    btnSignOut.addEventListener('click', async () => {
+      await window.FGNAuth.signOut();
+      updateAuthUI(null);
+      showToast('Signed out successfully.');
+      await loadProgress();
+    });
+  }
+
+  // Auth state changes (tab switching, token refresh)
+  window.addEventListener('fgn:authchange', async (e) => {
+    const { event, session } = e.detail;
+    const user = session?.user ?? null;
+    updateAuthUI(user);
+    if (event === 'SIGNED_IN') {
+      await syncProfileFromSupabase();
+      await syncDocumentsFromSupabase();
+      await loadProgress();
+    } else if (event === 'SIGNED_OUT') {
+      await loadProgress();
+    }
+  });
+}
+
 // Data Fetchers
+
 async function loadAllData() {
   try {
     await loadProfile();
@@ -267,6 +537,11 @@ async function saveProfile() {
         setTimeout(() => { saveStatus.textContent = ''; }, 3000);
       }
 
+      // Sync to Supabase if user is signed in
+      if (state.currentUser) {
+        await window.FGNDB.upsertProfile(state.currentUser.id, payload);
+      }
+
       await Promise.allSettled([
         loadColleges(),
         loadScholarships(),
@@ -279,6 +554,7 @@ async function saveProfile() {
     if (saveStatus) saveStatus.textContent = 'Error updating profile.';
   }
 }
+
 
 function setPreset(name, percentile, category, st, income, branch, budget, btnId) {
   document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
@@ -844,6 +1120,12 @@ async function confirmDocumentUpload() {
     if (res.ok) {
       document.getElementById('uploadDocModal').classList.remove('open');
       showToast(`Document "${docType}" successfully uploaded and recorded.`);
+
+      // Sync to Supabase if user is signed in
+      if (state.currentUser) {
+        await window.FGNDB.upsertDocument(state.currentUser.id, docType, fileName);
+      }
+
       await Promise.allSettled([
         loadDocuments(),
         loadScholarships()
@@ -853,6 +1135,7 @@ async function confirmDocumentUpload() {
     showToast('Failed to record document upload.');
   }
 }
+
 
 // Deadlines & Roadmap
 async function loadDeadlines() {
