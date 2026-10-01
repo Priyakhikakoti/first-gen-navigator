@@ -100,6 +100,16 @@ function buildTieredResponse(colleges, student) {
       affordabilityTier: getAffordabilityTier(netCost, student.annualBudget)
     };
 
+    // Calculate estimated rank
+    const crlRank = Math.max(1, Math.round((100 - pct) * 14000));
+    let categoryRank = crlRank;
+    if (cat === 'OBC-NCL' || cat === 'OBC') categoryRank = Math.round(crlRank * 0.28);
+    else if (cat === 'EWS') categoryRank = Math.round(crlRank * 0.11);
+    else if (cat === 'SC') categoryRank = Math.round(crlRank * 0.15);
+    else if (cat === 'ST') categoryRank = Math.round(crlRank * 0.075);
+
+    const closingRank = Math.max(1, Math.round((100 - effectiveCutoff) * 14000));
+
     const enriched = {
       ...c,
       id: c.id,
@@ -110,6 +120,10 @@ function buildTieredResponse(colleges, student) {
       branch: branch in (c.cutoffs || {}) ? branch : 'CSE',
       effectiveCutoff,
       cutoffPercentile: effectiveCutoff,
+      crlRank,
+      categoryRank,
+      closingRank,
+      margin: Number(diff.toFixed(1)),
       isHomeState: isHS,
       isHomeStateEligible: isHS,
       counsellingBoard: c.counsellingBoard,
@@ -117,14 +131,29 @@ function buildTieredResponse(colleges, student) {
       dataSource: c.dataSource || 'Anakin Enriched'
     };
 
-    if (diff >= 2) DREAM.push(enriched);
-    else if (diff >= -3) REALISTIC.push(enriched);
-    else SAFE.push(enriched);
+    // Accurate Tier Classification
+    // Safe: Score is comfortably above closing cutoff (+3.0%ile or more)
+    // Realistic: Score is close to cutoff (-2.0%ile to +3.0%ile)
+    // Dream: Score is below cutoff (aspirational reach)
+    if (diff >= 3.0) {
+      enriched.tier = 'SAFE';
+      enriched.admissionProbability = 'High (>85%)';
+      SAFE.push(enriched);
+    } else if (diff >= -2.0) {
+      enriched.tier = 'REALISTIC';
+      enriched.admissionProbability = 'Competitive (50% - 80%)';
+      REALISTIC.push(enriched);
+    } else {
+      enriched.tier = 'DREAM';
+      enriched.admissionProbability = 'Aspirational (20% - 40%)';
+      DREAM.push(enriched);
+    }
   });
 
   return {
     tiers: { DREAM, REALISTIC, SAFE },
     student,
+    crlRank: Math.max(1, Math.round((100 - pct) * 14000)),
     generatedAt: new Date().toISOString(),
     dataSource: 'Anakin Web Scraper'
   };
@@ -294,10 +323,11 @@ function buildScholarshipsFromScraped(data, student) {
       name: 'NSP Post-Matric OBC Scholarship',
       provider: 'Ministry of Social Justice & Empowerment (Govt. of India)',
       annualAmount: 50000,
-      deadlineDate: '31 Oct 2025',
+      deadlineDate: '2026-10-31',
       applicationUrl: 'https://scholarships.gov.in',
       eligibleCategories: ['OBC-NCL', 'OBC'],
       incomeLimit: 100000,
+      requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
       dataSource: enrichedText.includes('OBC') ? 'Anakin Scraped' : 'Base Data'
     },
     {
@@ -305,10 +335,11 @@ function buildScholarshipsFromScraped(data, student) {
       name: 'NSP Post-Matric SC Scholarship',
       provider: 'Ministry of Social Justice & Empowerment (Govt. of India)',
       annualAmount: 77000,
-      deadlineDate: '31 Oct 2025',
+      deadlineDate: '2026-10-31',
       applicationUrl: 'https://scholarships.gov.in',
       eligibleCategories: ['SC'],
       incomeLimit: 250000,
+      requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
       dataSource: enrichedText.includes('SC') ? 'Anakin Scraped' : 'Base Data'
     },
     {
@@ -316,10 +347,11 @@ function buildScholarshipsFromScraped(data, student) {
       name: 'NSP Post-Matric ST Scholarship',
       provider: 'Ministry of Tribal Affairs (Govt. of India)',
       annualAmount: 77000,
-      deadlineDate: '31 Oct 2025',
+      deadlineDate: '2026-10-31',
       applicationUrl: 'https://scholarships.gov.in',
       eligibleCategories: ['ST'],
       incomeLimit: 250000,
+      requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
       dataSource: enrichedText.includes('ST') ? 'Anakin Scraped' : 'Base Data'
     },
     {
@@ -327,11 +359,12 @@ function buildScholarshipsFromScraped(data, student) {
       name: 'e-Kalyan Post-Matric OBC (Jharkhand)',
       provider: 'Welfare Department, Govt. of Jharkhand',
       annualAmount: 60000,
-      deadlineDate: '15 Nov 2025',
+      deadlineDate: '2026-10-25',
       applicationUrl: 'https://ekalyan.cgg.gov.in',
       eligibleCategories: ['OBC-NCL', 'OBC'],
       incomeLimit: 250000,
       stateRestriction: 'Jharkhand',
+      requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Domicile / Residence Certificate', 'Bank Passbook (First Page)'],
       dataSource: enrichedText.includes('e-Kalyan') ? 'Anakin Scraped' : 'Base Data'
     },
     {
@@ -339,10 +372,11 @@ function buildScholarshipsFromScraped(data, student) {
       name: 'Central Sector Scheme of Scholarships',
       provider: 'Department of Higher Education, MHRD',
       annualAmount: 20000,
-      deadlineDate: '31 Dec 2025',
+      deadlineDate: '2026-11-15',
       applicationUrl: 'https://scholarships.gov.in',
       eligibleCategories: ['GEN', 'OBC-NCL', 'EWS'],
       incomeLimit: 450000,
+      requiredDocuments: ['Income Certificate', 'Class 12 Marksheet', 'Bank Passbook (First Page)', 'Aadhaar Card'],
       dataSource: 'Base Data'
     },
     {
@@ -350,10 +384,11 @@ function buildScholarshipsFromScraped(data, student) {
       name: 'PM YASASVI (OBC/EBC/DNT) Scholarship',
       provider: 'Ministry of Social Justice (Govt. of India)',
       annualAmount: 75000,
-      deadlineDate: '31 Oct 2025',
+      deadlineDate: '2026-11-30',
       applicationUrl: 'https://yet.nta.ac.in',
       eligibleCategories: ['OBC-NCL', 'EWS'],
       incomeLimit: 250000,
+      requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Aadhaar Card'],
       dataSource: enrichedText.includes('YASASVI') ? 'Anakin Scraped' : 'Base Data'
     }
   ];
@@ -567,14 +602,73 @@ app.post('/api/documents', (req, res) => {
 
 // Deadlines
 app.get('/api/deadlines', (req, res) => {
-  res.json([
-    { id: 'DL-01', title: 'JoSAA Round 1 Choice Filling', date: '2025-06-15', category: 'Admission', urgency: 'HIGH', url: 'https://josaa.admissions.nic.in' },
-    { id: 'DL-02', title: 'NSP Scholarship Application Opens', date: '2025-09-01', category: 'Scholarship', urgency: 'MEDIUM', url: 'https://scholarships.gov.in' },
-    { id: 'DL-03', title: 'e-Kalyan OBC Scholarship Deadline', date: '2025-11-15', category: 'Scholarship', urgency: 'HIGH', url: 'https://ekalyan.cgg.gov.in' },
-    { id: 'DL-04', title: 'CSAB Special Round Registration', date: '2025-08-10', category: 'Admission', urgency: 'MEDIUM', url: 'https://csab.nic.in' },
-    { id: 'DL-05', title: 'Income Certificate Renewal (State)', date: '2026-03-31', category: 'Document', urgency: 'LOW', url: null },
-    { id: 'DL-06', title: 'Central Sector Scholarship Deadline', date: '2025-12-31', category: 'Scholarship', urgency: 'LOW', url: 'https://scholarships.gov.in' }
-  ]);
+  const now = new Date();
+  const rawDeadlines = [
+    {
+      id: 'DL-01',
+      title: 'JoSAA Choice Locking & Registration (Round 1)',
+      date: '2026-10-18',
+      category: 'Admission',
+      urgency: 'HIGH',
+      requiredDocuments: ['Class 10 Marksheet & Certificate', 'Class 12 Marksheet', 'Caste / Category Certificate', 'Domicile / Residence Certificate'],
+      description: 'Choice locking closes strictly on the JoSAA portal.',
+      url: 'https://josaa.admissions.nic.in'
+    },
+    {
+      id: 'DL-02',
+      title: 'e-Kalyan Jharkhand Post-Matric Scholarship Deadline',
+      date: '2026-10-25',
+      category: 'Scholarship',
+      urgency: 'HIGH',
+      requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Domicile / Residence Certificate', 'Bank Passbook (First Page)'],
+      description: 'Mandatory online application window with Tehsildar verified income certificate.',
+      url: 'https://ekalyan.cgg.gov.in'
+    },
+    {
+      id: 'DL-03',
+      title: 'Central Sector Scheme of Scholarships (NSP)',
+      date: '2026-11-15',
+      category: 'Scholarship',
+      urgency: 'MEDIUM',
+      requiredDocuments: ['Income Certificate', 'Class 12 Marksheet', 'Bank Passbook (First Page)', 'Aadhaar Card'],
+      description: 'Department of Higher Education merit-cum-means financial grant portal.',
+      url: 'https://scholarships.gov.in'
+    },
+    {
+      id: 'DL-04',
+      title: 'State Domicile & Tehsildar Income Certificate Freshness Renewal',
+      date: '2026-11-05',
+      category: 'Document',
+      urgency: 'MEDIUM',
+      requiredDocuments: ['Income Certificate'],
+      description: 'State authorities require certificates issued after 1st April of current financial year.',
+      url: null
+    },
+    {
+      id: 'DL-05',
+      title: 'CSAB Special Vacant Seats Special Round Registration',
+      date: '2026-11-28',
+      category: 'Admission',
+      urgency: 'LOW',
+      requiredDocuments: ['JEE Main Scorecard', 'Class 12 Marksheet'],
+      description: 'Direct spot/special round for vacant NIT/IIIT/GFTI seats.',
+      url: 'https://csab.nic.in'
+    }
+  ];
+
+  const deadlines = rawDeadlines.map(d => {
+    const target = new Date(d.date);
+    const diffMs = target.getTime() - now.getTime();
+    const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    return {
+      ...d,
+      daysRemaining,
+      dueDate: d.date,
+      deadlineDate: d.date
+    };
+  });
+
+  res.json({ deadlines });
 });
 
 // Roadmap

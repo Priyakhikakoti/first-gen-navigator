@@ -14,6 +14,9 @@
   <link rel="stylesheet" href="styles.css" />
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- OCR & PDF Processing Engines for Document Verification -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
   <!-- Auth Status Bar -->
@@ -63,13 +66,16 @@
         <a href="#colleges-section" class="nav-link" id="nav-colleges">Colleges</a>
         <a href="#scholarships-section" class="nav-link" id="nav-scholarships">Scholarships</a>
         <a href="#calculator-section" class="nav-link" id="nav-calculator">Affordability</a>
-        <a href="#alternatives-section" class="nav-link" id="nav-alternatives">Pathways</a>
-        <a href="#documents-section" class="nav-link" id="nav-documents">Documents</a>
-        <a href="#deadlines-section" class="nav-link" id="nav-deadlines">Deadlines</a>
-        <a href="#progress-section" class="nav-link" id="nav-progress">My Progress</a>
+        <a href="#documents-section" class="nav-link" id="nav-documents">Document Verification</a>
+        <a href="#readiness-section" class="nav-link" id="nav-readiness">Readiness & Actions</a>
+        <a href="#deadlines-section" class="nav-link" id="nav-deadlines">Deadlines & Risk</a>
       </nav>
       <div class="header-cta">
         <button id="btnQuickRecalc" class="btn-secondary-sm">Refresh Matches</button>
+        <button id="btnOpenCompareHeader" class="btn-primary-sm" style="margin-left: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+          <span>⚖️ Compare</span>
+          <span class="compare-badge-count" id="compareHeaderCount">0</span>
+        </button>
       </div>
     </div>
   </header>
@@ -106,13 +112,58 @@
           </div>
           <div class="stat-item">
             <div class="stat-number" id="statDocsReady">5 / 7</div>
-            <div class="stat-title">Document Vault Readiness</div>
+            <div class="stat-title">Document Verification</div>
             <div class="stat-desc" id="statDocsStatus">2 critical documents pending</div>
           </div>
         </div>
       </div>
     </div>
   </section>
+
+  <!-- ⭐ Main MVP Flow Bar -->
+  <nav class="mvp-flow-bar" id="mvpFlowBar" aria-label="Main MVP Flow">
+    <div class="container flow-bar-inner">
+      <div class="flow-header-label">
+        <span class="flow-star">⭐</span> <strong>Main MVP Flow:</strong>
+      </div>
+      <div class="flow-steps-scroll">
+        <a href="#profile-section" class="flow-step-item active" data-step="profile">
+          <span class="step-num">1</span>
+          <span class="step-name">Profile</span>
+        </a>
+        <span class="flow-sep">&rarr;</span>
+        <a href="#colleges-section" class="flow-step-item" data-step="colleges">
+          <span class="step-num">2</span>
+          <span class="step-name">College & Scholarship Match</span>
+        </a>
+        <span class="flow-sep">&rarr;</span>
+        <a href="#calculator-section" class="flow-step-item" data-step="affordability">
+          <span class="step-num">3</span>
+          <span class="step-name">Affordability</span>
+        </a>
+        <span class="flow-sep">&rarr;</span>
+        <a href="#documents-section" class="flow-step-item" data-step="documents">
+          <span class="step-num">4</span>
+          <span class="step-name">Document Verification</span>
+        </a>
+        <span class="flow-sep">&rarr;</span>
+        <a href="#readiness-section" class="flow-step-item" data-step="readiness">
+          <span class="step-num">5</span>
+          <span class="step-name">Application Readiness</span>
+        </a>
+        <span class="flow-sep">&rarr;</span>
+        <a href="#deadlines-section" class="flow-step-item" data-step="deadlines">
+          <span class="step-num">6</span>
+          <span class="step-name">Deadline Risk</span>
+        </a>
+        <span class="flow-sep">&rarr;</span>
+        <a href="#next-actions-section" class="flow-step-item" data-step="what-next">
+          <span class="step-num">7</span>
+          <span class="step-name">What Next?</span>
+        </a>
+      </div>
+    </div>
+  </nav>
 
   <!-- Section 1: Student Profile -->
   <section id="profile-section" class="section-wrapper bg-white">
@@ -194,6 +245,23 @@
           <span class="save-status" id="profileSaveStatus"></span>
         </div>
       </form>
+
+      <!-- Application Error & Inconsistency Checker -->
+      <div class="error-checker-wrapper" id="appErrorCheckerSection">
+        <div class="error-checker-card" id="appErrorCheckerCard">
+          <div class="error-checker-header">
+            <div class="error-checker-title-wrap">
+              <span class="shield-icon">🛡️</span>
+              <h3 class="error-checker-title">Application Error & Compliance Checker</h3>
+              <span class="error-count-badge" id="errorCountBadge">Auditing profile...</span>
+            </div>
+            <button type="button" class="btn-secondary-sm" id="btnRecheckErrors">Re-check Rules</button>
+          </div>
+          <div class="error-checker-list" id="errorCheckerList">
+            <!-- Populated dynamically via app.js -->
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -334,26 +402,40 @@
     </div>
   </section>
 
-  <!-- Section 6: Document Readiness Vault -->
+  <!-- Section 4: Document Verification Vault -->
   <section id="documents-section" class="section-wrapper bg-soft">
     <div class="container">
       <div class="section-header flex-between">
         <div>
-          <div class="section-badge">Step 6</div>
-          <h2 class="section-title">Document Readiness Vault</h2>
-          <p class="section-subtitle">Upload and track government-issued certificates required for seat allocation and fee waivers.</p>
+          <div class="section-badge">Step 4</div>
+          <h2 class="section-title">Document Verification Vault</h2>
+          <p class="section-subtitle">Upload certificates for automated OCR inspection, document-type verification, and PII masking.</p>
         </div>
         <div class="vault-header-actions">
           <div class="vault-score-badge" id="vaultScoreBadge">
             <span id="vaultScoreText">5 of 7 Ready</span>
           </div>
-          <button id="btnOpenUploadModalNew" class="btn-primary-sm">+ Upload Document</button>
+          <button id="btnOpenUploadModalNew" class="btn-primary-sm">+ Upload & Verify Document</button>
         </div>
       </div>
 
-      <div class="vault-upload-banner">
-        <div class="vault-upload-banner-text">
-          <strong>Document Submission Center:</strong> Select any document card below to upload or update your verified PDF / DigiLocker certificates, or click <strong>+ Upload Document</strong> to add additional documentation.
+      <!-- Drag & Drop OCR Ingestion Zone -->
+      <div class="doc-dropzone" id="docDropzone">
+        <input type="file" id="dropzoneFileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none;" />
+        <div class="dropzone-inner" id="dropzoneClickTarget">
+          <div class="dropzone-icon">📄</div>
+          <div class="dropzone-text">
+            <strong>Drag & drop any admission certificate here</strong> or <span class="dropzone-link">browse files</span>
+          </div>
+          <div class="dropzone-hint">Supports PDF, JPG, PNG &bull; Automated OCR Classification &bull; PII Masking Protected</div>
+        </div>
+        <!-- OCR Live Scanning Banner -->
+        <div class="ocr-scanning-overlay" id="ocrScanningOverlay" style="display:none;">
+          <div class="ocr-spinner"></div>
+          <div class="ocr-scan-text">
+            <strong id="ocrScanTitle">Analyzing Document via OCR...</strong>
+            <span id="ocrScanSub">Classifying certificate type and verifying authenticity markers</span>
+          </div>
         </div>
       </div>
 
@@ -363,19 +445,106 @@
     </div>
   </section>
 
-  <!-- Section 7: Deadlines & Action Roadmap -->
-  <section id="deadlines-section" class="section-wrapper bg-white">
+  <!-- Section 5: Application Readiness Score & What Should I Do Next? -->
+  <section id="readiness-section" class="section-wrapper bg-white">
     <div class="container">
       <div class="section-header">
-        <div class="section-badge">Step 7</div>
-        <h2 class="section-title">Admission Deadlines & Action Roadmap</h2>
-        <p class="section-subtitle">Timeline monitoring for preference locking, document verification windows, and scholarship portals.</p>
+        <div class="section-badge">Step 5</div>
+        <h2 class="section-title">Application Readiness & Strategic Action Plan</h2>
+        <p class="section-subtitle">Real-time composite readiness score combining document verification, quota eligibility, and deadline buffers.</p>
+      </div>
+
+      <div class="readiness-grid">
+        <!-- Readiness Score Card -->
+        <div class="readiness-score-card">
+          <div class="readiness-gauge-wrap">
+            <div class="readiness-gauge-circle" id="readinessGaugeCircle">
+              <svg class="gauge-svg" viewBox="0 0 120 120">
+                <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
+                <circle class="gauge-progress" id="readinessGaugeBar" cx="60" cy="60" r="50"></circle>
+              </svg>
+              <div class="gauge-inner-content">
+                <span class="gauge-pct" id="readinessScoreVal">82%</span>
+                <span class="gauge-sublabel">Ready</span>
+              </div>
+            </div>
+          </div>
+          <div class="readiness-status-text">
+            <h4 class="readiness-tier-title" id="readinessTierTitle">Competitive Readiness</h4>
+            <p class="readiness-tier-desc" id="readinessTierDesc">Your core academic profile is verified. Resolving pending items will achieve 100% submission security.</p>
+          </div>
+          
+          <div class="readiness-breakdown-bars">
+            <div class="breakdown-bar-item">
+              <div class="breakdown-label-row">
+                <span>Document Verification (40% weight)</span>
+                <strong id="barDocsVal">32%</strong>
+              </div>
+              <div class="breakdown-track"><div class="breakdown-fill fill-docs" id="barDocsFill" style="width: 80%;"></div></div>
+            </div>
+            <div class="breakdown-bar-item">
+              <div class="breakdown-label-row">
+                <span>Profile & Quota Eligibility (30% weight)</span>
+                <strong id="barProfileVal">30%</strong>
+              </div>
+              <div class="breakdown-track"><div class="breakdown-fill fill-profile" id="barProfileFill" style="width: 100%;"></div></div>
+            </div>
+            <div class="breakdown-bar-item">
+              <div class="breakdown-label-row">
+                <span>Deadline Safety Buffer (30% weight)</span>
+                <strong id="barDeadlineVal">20%</strong>
+              </div>
+              <div class="breakdown-track"><div class="breakdown-fill fill-deadline" id="barDeadlineFill" style="width: 66%;"></div></div>
+            </div>
+          </div>
+
+          <!-- Instant Boosters -->
+          <div class="readiness-boosters">
+            <span class="boosters-title">⚡ Instant Score Boosters:</span>
+            <div class="boosters-list" id="readinessBoostersList">
+              <!-- Rendered dynamically via app.js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- What Should I Do Next? -->
+        <div class="what-next-card" id="next-actions-section">
+          <div class="what-next-header">
+            <div>
+              <span class="section-badge-amber">Action Engine</span>
+              <h3 class="what-next-title">“What Should I Do Next?”</h3>
+            </div>
+            <span class="what-next-subtitle">Top prioritized actions to maximize admission probability & avoid missed deadlines:</span>
+          </div>
+          <div class="what-next-actions-list" id="whatNextActionsList">
+            <!-- Populated dynamically via app.js -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 6: Admission Deadlines & Deadline Risk Monitoring -->
+  <section id="deadlines-section" class="section-wrapper bg-soft">
+    <div class="container">
+      <div class="section-header flex-between">
+        <div>
+          <div class="section-badge">Step 6</div>
+          <h2 class="section-title">Admission Deadlines & Deadline Risk Monitoring</h2>
+          <p class="section-subtitle">Real-time countdown calculation with automated deadline risk assessment based on missing certificates.</p>
+        </div>
+        <div class="deadline-filter-tabs">
+          <button class="d-filter-btn active" data-filter="all">All Deadlines</button>
+          <button class="d-filter-btn filter-high-risk" data-filter="high-risk">🚨 High Risk Only</button>
+          <button class="d-filter-btn" data-filter="admission">Admissions</button>
+          <button class="d-filter-btn" data-filter="scholarship">Scholarships</button>
+        </div>
       </div>
 
       <div class="roadmap-and-deadlines-grid">
         <!-- Deadlines Column -->
         <div class="deadlines-col">
-          <h3 class="col-title">Upcoming Deadlines</h3>
+          <h3 class="col-title">Upcoming Admission & Scholarship Deadlines</h3>
           <div class="deadlines-list" id="deadlinesList">
             <!-- Rendered dynamically -->
           </div>
@@ -450,19 +619,21 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <h3 class="modal-title" id="uploadModalTitle">Upload Document</h3>
+          <h3 class="modal-title" id="uploadModalTitle">Upload & Verify Certificate</h3>
+          <p class="modal-sub">Files are scanned with OCR to classify document type and mask sensitive PII.</p>
         </div>
         <button class="modal-close" id="btnCloseUploadModal">&times;</button>
       </div>
       <form id="uploadDocForm" class="modal-body">
         <div class="form-group">
-          <label for="uploadDocTypeSelect">Document Type</label>
+          <label for="uploadDocTypeSelect">Target Document Type</label>
           <select id="uploadDocTypeSelect" class="form-group select">
             <option value="Aadhaar">Aadhaar Card</option>
             <option value="Income Certificate">Annual Family Income Certificate (Tehsildar/SDO)</option>
             <option value="Domicile Certificate">State Domicile / Residential Certificate</option>
             <option value="Caste Certificate">Caste / Category Certificate (OBC/EWS/SC/ST)</option>
             <option value="JEE Scorecard">JEE Main Official Scorecard</option>
+            <option value="Class 10 Marksheet">Class 10 Board Marksheet & Certificate</option>
             <option value="Class 12 Marksheet">Class 12 Board Marksheet & Certificate</option>
             <option value="Bank Details">Bank Passbook / Cancelled Cheque</option>
             <option value="Other">Other Institutional Verification Certificate</option>
@@ -475,9 +646,23 @@
         </div>
 
         <div class="form-group">
-          <label for="realFileInput">Select Certificate File</label>
-          <input type="file" id="realFileInput" accept=".pdf,.jpg,.jpeg,.png" style="padding: 0.4rem; background: var(--color-slate-100);" />
-          <small class="field-hint">Accepted file formats: PDF, JPG, PNG (Max 5MB)</small>
+          <label for="realFileInput">Select File to Verify</label>
+          <input type="file" id="realFileInput" accept=".pdf,.jpg,.jpeg,.png" style="padding: 0.5rem; background: var(--color-slate-100); width: 100%; border-radius: var(--radius-sm);" />
+          <small class="field-hint">Accepted formats: PDF, JPG, PNG (Max 10MB) &bull; DigiLocker scans accepted</small>
+        </div>
+
+        <!-- Real-time OCR Classification Preview Box -->
+        <div class="ocr-preview-box" id="ocrUploadPreviewBox" style="display: none;">
+          <div class="ocr-preview-header">
+            <span class="ocr-preview-title">Automated Classification & Verification:</span>
+            <span class="ocr-preview-badge" id="ocrVerificationBadge">Scanning...</span>
+          </div>
+          <div class="ocr-detected-text" id="ocrDetectedText">
+            Extracting text and identifying issuing authority...
+          </div>
+          <div class="ocr-privacy-notice">
+            <span>🔒 <strong>Privacy Guard:</strong> Sensitive identification numbers (Aadhaar / Bank Account) are automatically masked before saving.</span>
+          </div>
         </div>
 
         <div class="form-group">
@@ -487,7 +672,67 @@
       </form>
       <div class="modal-footer">
         <button class="btn-secondary-sm" id="btnCancelUpload">Cancel</button>
-        <button class="btn-primary-sm" id="btnConfirmUpload">Save and Verify Document</button>
+        <button class="btn-primary-sm" id="btnConfirmUpload">Confirm & Save Verified Document</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Document Privacy & Audit Log -->
+  <div class="modal-backdrop" id="docAuditModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="docAuditTitle">Document Verification & Privacy Audit</h3>
+          <p class="modal-sub">Review certificate authentication markers and privacy protection log.</p>
+        </div>
+        <button class="modal-close" id="btnCloseDocAuditModal">&times;</button>
+      </div>
+      <div class="modal-body" id="docAuditBody">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+      <div class="modal-footer flex-between">
+        <button class="btn-danger-sm" id="btnDeleteDocument">🗑️ Delete Document Permanently</button>
+        <button class="btn-secondary-sm" id="btnCloseDocAuditFooter">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Opportunity Comparison Matrix -->
+  <div class="modal-backdrop" id="compareModal">
+    <div class="modal-dialog modal-dialog-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">Opportunity Comparison Matrix</h3>
+          <p class="modal-sub">Compare colleges and scholarships side-by-side by fees, cutoffs, eligibility, and net out-of-pocket costs.</p>
+        </div>
+        <button class="modal-close" id="btnCloseCompareModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="compare-toggle-bar">
+          <button class="btn-tab-toggle active" id="tabCompareColleges">Institutions Comparison</button>
+          <button class="btn-tab-toggle" id="tabCompareScholarships">Scholarships Comparison</button>
+        </div>
+        <div class="compare-matrix-scroll" id="compareMatrixContainer">
+          <!-- Populated dynamically via app.js -->
+        </div>
+      </div>
+      <div class="modal-footer flex-between">
+        <button class="btn-secondary-sm" id="btnClearCompareModal">Clear All Selections</button>
+        <button class="btn-secondary-sm" id="btnCloseCompareFooter">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Comparison Dock -->
+  <div class="floating-compare-bar" id="floatingCompareBar" style="display: none;">
+    <div class="compare-bar-content">
+      <div class="compare-bar-left">
+        <span class="compare-icon">⚖️</span>
+        <span class="compare-summary-text" id="compareSummaryText">0 items selected to compare</span>
+      </div>
+      <div class="compare-bar-right">
+        <button class="btn-clear-compare" id="btnClearCompare">Clear</button>
+        <button class="btn-primary-sm" id="btnOpenCompareFloating">Compare Opportunities &rarr;</button>
       </div>
     </div>
   </div>
