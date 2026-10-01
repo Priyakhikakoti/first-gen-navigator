@@ -133,11 +133,23 @@ public class DataStore {
 
         // 8. NIT Silchar (Assam)
         College nitSilchar = new College("COL-08", "National Institute of Technology (NIT) Silchar", 
-                "NIT-SIL", "Assam", "NIT", 40, 125000, 38000, true, "JoSAA / CSAB", 2.5);
+                "NIT-SIL", "Assam", "NIT", 40, 125000, 38000, true, "JoSAA / CSAB", 3.5);
         nitSilchar.addBranchCutoff("CSE", "GEN", 96.8);
         nitSilchar.addBranchCutoff("CSE", "OBC-NCL", 93.2);
+        nitSilchar.addBranchCutoff("CSE", "EWS", 94.0);
+        nitSilchar.addBranchCutoff("CSE", "SC", 84.0);
+        nitSilchar.addBranchCutoff("CSE", "ST", 76.0);
         nitSilchar.addBranchCutoff("ECE", "GEN", 93.5);
         nitSilchar.addBranchCutoff("ECE", "OBC-NCL", 89.5);
+        nitSilchar.addBranchCutoff("ECE", "EWS", 90.5);
+        nitSilchar.addBranchCutoff("ECE", "SC", 78.0);
+        nitSilchar.addBranchCutoff("ECE", "ST", 70.0);
+        nitSilchar.addBranchCutoff("EE", "GEN", 91.5);
+        nitSilchar.addBranchCutoff("EE", "OBC-NCL", 86.5);
+        nitSilchar.addBranchCutoff("ME", "GEN", 89.0);
+        nitSilchar.addBranchCutoff("ME", "OBC-NCL", 83.5);
+        nitSilchar.addBranchCutoff("CE", "GEN", 87.0);
+        nitSilchar.addBranchCutoff("CE", "OBC-NCL", 81.0);
         colleges.put(nitSilchar.getId(), nitSilchar);
 
         // 9. Jadavpur University, Kolkata (West Bengal)
@@ -157,6 +169,185 @@ public class DataStore {
         mnnit.addBranchCutoff("ECE", "GEN", 95.8);
         mnnit.addBranchCutoff("ECE", "OBC-NCL", 92.5);
         colleges.put(mnnit.getId(), mnnit);
+
+        // 11. Indian Institute of Technology (IIT) Guwahati (Assam)
+        College iitGuwahati = new College("COL-11", "Indian Institute of Technology (IIT) Guwahati", 
+                "IIT-GHY", "Assam", "IIT", 7, 200000, 58000, true, "JoSAA / JEE Advanced", 0.0);
+        iitGuwahati.addBranchCutoff("CSE", "GEN", 99.6);
+        iitGuwahati.addBranchCutoff("CSE", "OBC-NCL", 98.5);
+        iitGuwahati.addBranchCutoff("CSE", "EWS", 98.8);
+        iitGuwahati.addBranchCutoff("CSE", "SC", 93.0);
+        iitGuwahati.addBranchCutoff("CSE", "ST", 88.0);
+        iitGuwahati.addBranchCutoff("ECE", "GEN", 98.8);
+        iitGuwahati.addBranchCutoff("ECE", "OBC-NCL", 96.8);
+        iitGuwahati.addBranchCutoff("EE", "GEN", 97.8);
+        iitGuwahati.addBranchCutoff("EE", "OBC-NCL", 94.5);
+        iitGuwahati.addBranchCutoff("ME", "GEN", 96.5);
+        iitGuwahati.addBranchCutoff("ME", "OBC-NCL", 92.5);
+        iitGuwahati.addBranchCutoff("CE", "GEN", 95.0);
+        iitGuwahati.addBranchCutoff("CE", "OBC-NCL", 90.0);
+        colleges.put(iitGuwahati.getId(), iitGuwahati);
+
+        // 12. Indian Institute of Information Technology (IIIT) Guwahati (Assam)
+        College iiitGuwahati = new College("COL-12", "Indian Institute of Information Technology (IIIT) Guwahati", 
+                "IIIT-GHY", "Assam", "IIIT", 85, 225000, 48000, false, "JoSAA / CSAB", 1.5);
+        iiitGuwahati.addBranchCutoff("CSE", "GEN", 97.0);
+        iiitGuwahati.addBranchCutoff("CSE", "OBC-NCL", 93.5);
+        iiitGuwahati.addBranchCutoff("CSE", "EWS", 94.2);
+        iiitGuwahati.addBranchCutoff("CSE", "SC", 84.0);
+        iiitGuwahati.addBranchCutoff("CSE", "ST", 75.0);
+        iiitGuwahati.addBranchCutoff("ECE", "GEN", 94.5);
+        iiitGuwahati.addBranchCutoff("ECE", "OBC-NCL", 90.0);
+        iiitGuwahati.addBranchCutoff("ECE", "SC", 78.0);
+        colleges.put(iiitGuwahati.getId(), iiitGuwahati);
+
+        // 13. Assam Engineering College (AEC), Jalukbari, Guwahati (Assam Premier State Govt - Est. 1955)
+        College aec = new College("COL-13", "Assam Engineering College (AEC) Jalukbari, Guwahati", 
+                "AEC-GHY", "Assam", "State Govt", 130, 18000, 14000, true, "DTE Assam / Assam CEE / JEE Main", 5.0);
+        aec.addBranchCutoff("CSE", "GEN", 92.5);
+        aec.addBranchCutoff("CSE", "OBC-NCL", 86.0);
+        aec.addBranchCutoff("CSE", "EWS", 87.5);
+        aec.addBranchCutoff("CSE", "SC", 78.0);
+        aec.addBranchCutoff("CSE", "ST", 70.0);
+        aec.addBranchCutoff("ECE", "GEN", 89.0);
+        aec.addBranchCutoff("ECE", "OBC-NCL", 82.0);
+        aec.addBranchCutoff("ECE", "SC", 73.0);
+        aec.addBranchCutoff("EE", "GEN", 86.5);
+        aec.addBranchCutoff("EE", "OBC-NCL", 78.0);
+        aec.addBranchCutoff("ME", "GEN", 84.0);
+        aec.addBranchCutoff("ME", "OBC-NCL", 75.0);
+        aec.addBranchCutoff("CE", "GEN", 82.0);
+        aec.addBranchCutoff("CE", "OBC-NCL", 72.0);
+        colleges.put(aec.getId(), aec);
+
+        // 14. Jorhat Engineering College (JEC), Jorhat (Assam Premier State Govt - Est. 1960)
+        College jec = new College("COL-14", "Jorhat Engineering College (JEC) Jorhat", 
+                "JEC-JRH", "Assam", "State Govt", 145, 18000, 14000, true, "DTE Assam / Assam CEE / JEE Main", 5.0);
+        jec.addBranchCutoff("CSE", "GEN", 91.0);
+        jec.addBranchCutoff("CSE", "OBC-NCL", 84.5);
+        jec.addBranchCutoff("CSE", "EWS", 85.5);
+        jec.addBranchCutoff("CSE", "SC", 75.0);
+        jec.addBranchCutoff("CSE", "ST", 68.0);
+        jec.addBranchCutoff("EE", "GEN", 85.0);
+        jec.addBranchCutoff("EE", "OBC-NCL", 77.0);
+        jec.addBranchCutoff("ME", "GEN", 83.0);
+        jec.addBranchCutoff("ME", "OBC-NCL", 74.0);
+        jec.addBranchCutoff("CE", "GEN", 80.5);
+        jec.addBranchCutoff("CE", "OBC-NCL", 71.0);
+        colleges.put(jec.getId(), jec);
+
+        // 15. Tezpur University, School of Engineering (Assam - Central Univ / CFTI)
+        College tezpur = new College("COL-15", "Tezpur University, School of Engineering", 
+                "TU-SOE", "Assam", "CFTI", 69, 48000, 22000, true, "JoSAA / CSAB / TU Entrance", 4.0);
+        tezpur.addBranchCutoff("CSE", "GEN", 94.5);
+        tezpur.addBranchCutoff("CSE", "OBC-NCL", 89.0);
+        tezpur.addBranchCutoff("CSE", "EWS", 90.0);
+        tezpur.addBranchCutoff("CSE", "SC", 80.0);
+        tezpur.addBranchCutoff("CSE", "ST", 72.0);
+        tezpur.addBranchCutoff("ECE", "GEN", 91.0);
+        tezpur.addBranchCutoff("ECE", "OBC-NCL", 85.0);
+        tezpur.addBranchCutoff("EE", "GEN", 88.0);
+        tezpur.addBranchCutoff("EE", "OBC-NCL", 81.0);
+        tezpur.addBranchCutoff("ME", "GEN", 85.0);
+        tezpur.addBranchCutoff("ME", "OBC-NCL", 78.0);
+        tezpur.addBranchCutoff("CE", "GEN", 83.0);
+        tezpur.addBranchCutoff("CE", "OBC-NCL", 75.0);
+        colleges.put(tezpur.getId(), tezpur);
+
+        // 16. Central Institute of Technology (CIT) Kokrajhar (Assam - Deemed / CFTI)
+        College citKokrajhar = new College("COL-16", "Central Institute of Technology (CIT) Kokrajhar", 
+                "CIT-KKR", "Assam", "CFTI", 180, 42000, 20000, true, "JoSAA / CSAB / CIT Entrance", 5.0);
+        citKokrajhar.addBranchCutoff("CSE", "GEN", 89.0);
+        citKokrajhar.addBranchCutoff("CSE", "OBC-NCL", 81.0);
+        citKokrajhar.addBranchCutoff("CSE", "EWS", 82.5);
+        citKokrajhar.addBranchCutoff("CSE", "SC", 72.0);
+        citKokrajhar.addBranchCutoff("CSE", "ST", 65.0);
+        citKokrajhar.addBranchCutoff("ECE", "GEN", 85.0);
+        citKokrajhar.addBranchCutoff("ECE", "OBC-NCL", 76.0);
+        citKokrajhar.addBranchCutoff("IT", "GEN", 87.0);
+        citKokrajhar.addBranchCutoff("IT", "OBC-NCL", 79.0);
+        citKokrajhar.addBranchCutoff("CE", "GEN", 80.0);
+        citKokrajhar.addBranchCutoff("CE", "OBC-NCL", 70.0);
+        colleges.put(citKokrajhar.getId(), citKokrajhar);
+
+        // 17. Assam University, Silchar - TSSOT (Assam - Central Univ / GFTI)
+        College assamUniv = new College("COL-17", "Assam University, Triguna Sen School of Technology (TSSOT)", 
+                "AUS-TSSOT", "Assam", "GFTI", 160, 45000, 18000, true, "JoSAA / CSAB", 4.5);
+        assamUniv.addBranchCutoff("CSE", "GEN", 88.0);
+        assamUniv.addBranchCutoff("CSE", "OBC-NCL", 80.0);
+        assamUniv.addBranchCutoff("CSE", "EWS", 81.0);
+        assamUniv.addBranchCutoff("CSE", "SC", 70.0);
+        assamUniv.addBranchCutoff("CSE", "ST", 63.0);
+        assamUniv.addBranchCutoff("ECE", "GEN", 84.0);
+        assamUniv.addBranchCutoff("ECE", "OBC-NCL", 75.0);
+        assamUniv.addBranchCutoff("CE", "GEN", 78.0);
+        assamUniv.addBranchCutoff("CE", "OBC-NCL", 68.0);
+        colleges.put(assamUniv.getId(), assamUniv);
+
+        // 18. Bineswar Brahma Engineering College (BBEC), Kokrajhar (Assam State Govt)
+        College bbec = new College("COL-18", "Bineswar Brahma Engineering College (BBEC) Kokrajhar", 
+                "BBEC-KKR", "Assam", "State Govt", 220, 20000, 14000, true, "DTE Assam / Assam CEE", 6.0);
+        bbec.addBranchCutoff("CSE", "GEN", 85.0);
+        bbec.addBranchCutoff("CSE", "OBC-NCL", 77.0);
+        bbec.addBranchCutoff("CSE", "EWS", 78.0);
+        bbec.addBranchCutoff("CSE", "SC", 68.0);
+        bbec.addBranchCutoff("CSE", "ST", 60.0);
+        bbec.addBranchCutoff("EE", "GEN", 80.0);
+        bbec.addBranchCutoff("EE", "OBC-NCL", 71.0);
+        bbec.addBranchCutoff("ME", "GEN", 78.0);
+        bbec.addBranchCutoff("ME", "OBC-NCL", 69.0);
+        bbec.addBranchCutoff("CE", "GEN", 76.0);
+        bbec.addBranchCutoff("CE", "OBC-NCL", 66.0);
+        colleges.put(bbec.getId(), bbec);
+
+        // 19. Jorhat Institute of Science & Technology (JIST), Jorhat (Assam State Govt)
+        College jist = new College("COL-19", "Jorhat Institute of Science & Technology (JIST) Jorhat", 
+                "JIST-JRH", "Assam", "State Govt", 230, 20000, 14000, true, "DTE Assam / Assam CEE", 6.0);
+        jist.addBranchCutoff("CSE", "GEN", 83.5);
+        jist.addBranchCutoff("CSE", "OBC-NCL", 75.0);
+        jist.addBranchCutoff("CSE", "EWS", 76.5);
+        jist.addBranchCutoff("CSE", "SC", 66.0);
+        jist.addBranchCutoff("CSE", "ST", 58.0);
+        jist.addBranchCutoff("ECE", "GEN", 79.0);
+        jist.addBranchCutoff("ECE", "OBC-NCL", 70.0);
+        jist.addBranchCutoff("ME", "GEN", 77.0);
+        jist.addBranchCutoff("ME", "OBC-NCL", 68.0);
+        jist.addBranchCutoff("CE", "GEN", 75.0);
+        jist.addBranchCutoff("CE", "OBC-NCL", 65.0);
+        colleges.put(jist.getId(), jist);
+
+        // 20. Barak Valley Engineering College (BVEC), Karimganj (Assam State Govt)
+        College bvec = new College("COL-20", "Barak Valley Engineering College (BVEC) Karimganj", 
+                "BVEC-KRG", "Assam", "State Govt", 250, 20000, 14000, true, "DTE Assam / Assam CEE", 6.0);
+        bvec.addBranchCutoff("CSE", "GEN", 81.0);
+        bvec.addBranchCutoff("CSE", "OBC-NCL", 72.0);
+        bvec.addBranchCutoff("CSE", "EWS", 74.0);
+        bvec.addBranchCutoff("CSE", "SC", 63.0);
+        bvec.addBranchCutoff("CSE", "ST", 55.0);
+        bvec.addBranchCutoff("ECE", "GEN", 77.0);
+        bvec.addBranchCutoff("ECE", "OBC-NCL", 67.0);
+        bvec.addBranchCutoff("ME", "GEN", 74.0);
+        bvec.addBranchCutoff("ME", "OBC-NCL", 64.0);
+        bvec.addBranchCutoff("CE", "GEN", 72.0);
+        bvec.addBranchCutoff("CE", "OBC-NCL", 61.0);
+        colleges.put(bvec.getId(), bvec);
+
+        // 21. Girijananda Chowdhury University (GCU), Guwahati (Assam Private / Self-Financed)
+        College gcu = new College("COL-21", "Girijananda Chowdhury University (GCU) Guwahati", 
+                "GCU-GHY", "Assam", "Private", 260, 110000, 50000, true, "State / Direct / JEE Main", 3.0);
+        gcu.addBranchCutoff("CSE", "GEN", 72.0);
+        gcu.addBranchCutoff("CSE", "OBC-NCL", 64.0);
+        gcu.addBranchCutoff("CSE", "SC", 54.0);
+        gcu.addBranchCutoff("CSE", "ST", 46.0);
+        gcu.addBranchCutoff("ECE", "GEN", 68.0);
+        gcu.addBranchCutoff("ECE", "OBC-NCL", 60.0);
+        gcu.addBranchCutoff("EE", "GEN", 64.0);
+        gcu.addBranchCutoff("EE", "OBC-NCL", 56.0);
+        gcu.addBranchCutoff("ME", "GEN", 62.0);
+        gcu.addBranchCutoff("ME", "OBC-NCL", 54.0);
+        gcu.addBranchCutoff("CE", "GEN", 60.0);
+        gcu.addBranchCutoff("CE", "OBC-NCL", 52.0);
+        colleges.put(gcu.getId(), gcu);
     }
 
     private void seedScholarships() {
@@ -245,6 +436,41 @@ public class DataStore {
         sc6.addRequiredDocument("Income Certificate");
         sc6.addRequiredDocument("JEE Scorecard");
         scholarships.put(sc6.getId(), sc6);
+
+        // 7. Ishan Uday Special Scholarship for NER (Assam & North East)
+        Scholarship sc7 = new Scholarship("SCH-07", "Ishan Uday Special Scholarship for North Eastern Region (Assam)", 
+                "UGC / Ministry of Education (NSP)", 93600, 450000, "Assam", "2026-10-31", 
+                "Prestigious UGC scholarship providing Rs 7,800/month (Rs 93,600/year) for undergraduate technical/engineering students domiciled in Assam.", 
+                "https://scholarships.gov.in");
+        sc7.addEligibleCategory("GEN");
+        sc7.addEligibleCategory("OBC-NCL");
+        sc7.addEligibleCategory("EWS");
+        sc7.addEligibleCategory("SC");
+        sc7.addEligibleCategory("ST");
+        sc7.setMinPercentileRequired(60.0);
+        sc7.addRequiredDocument("Aadhaar");
+        sc7.addRequiredDocument("Income Certificate");
+        sc7.addRequiredDocument("Domicile Certificate");
+        sc7.addRequiredDocument("Class 12 Marksheet");
+        sc7.addRequiredDocument("Bank Details");
+        scholarships.put(sc7.getId(), sc7);
+
+        // 8. Assam DHE Combined Merit Scholarship
+        Scholarship sc8 = new Scholarship("SCH-08", "Assam DHE Combined Merit Scholarship", 
+                "Directorate of Higher Education, Govt of Assam", 24000, 500000, "Assam", "2026-11-15", 
+                "Merit-cum-means scholarship awarded by Govt. of Assam for degree engineering students pursuing studies in recognized colleges.", 
+                "https://dhe-operations.assam.gov.in");
+        sc8.addEligibleCategory("GEN");
+        sc8.addEligibleCategory("OBC-NCL");
+        sc8.addEligibleCategory("EWS");
+        sc8.addEligibleCategory("SC");
+        sc8.addEligibleCategory("ST");
+        sc8.setMinPercentileRequired(70.0);
+        sc8.addRequiredDocument("Aadhaar");
+        sc8.addRequiredDocument("Income Certificate");
+        sc8.addRequiredDocument("Domicile Certificate");
+        sc8.addRequiredDocument("Bank Details");
+        scholarships.put(sc8.getId(), sc8);
     }
 
     private void seedDeadlines() {

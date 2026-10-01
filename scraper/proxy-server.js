@@ -187,6 +187,13 @@ function getApplicableScholarship(student, college) {
     scholarship = Math.max(scholarship, 60000);
   }
 
+  // Ishan Uday Special Scholarship for NER (Assam & North East)
+  if (student?.state === 'Assam' && income <= 450000) {
+    scholarship = Math.max(scholarship, 93600);
+  } else if (student?.state === 'Assam' && income <= 500000) {
+    scholarship = Math.max(scholarship, 24000);
+  }
+
   // Central Sector Scheme (merit-based)
   if (Number(student?.jeePercentile) >= 80 && income <= 450000) {
     scholarship = Math.max(scholarship, 20000);
@@ -307,6 +314,152 @@ function getBaseColleges() {
         ECE: { GEN: 68.0, 'OBC-NCL': 60.0 },
         IT: { GEN: 70.0, 'OBC-NCL': 63.0 }
       }
+    },
+    {
+      id: 'COL-11', name: 'Indian Institute of Technology (IIT) Guwahati', shortCode: 'IIT-GHY',
+      state: 'Assam', type: 'IIT', nirfRank: 7,
+      annualTuition: 200000, annualHostel: 58000,
+      counsellingBoard: 'JoSAA / JEE Advanced',
+      cutoffs: {
+        CSE: { GEN: 99.6, 'OBC-NCL': 98.5, EWS: 98.8, SC: 93.0, ST: 88.0 },
+        ECE: { GEN: 98.8, 'OBC-NCL': 96.8, EWS: 97.2, SC: 89.0, ST: 82.0 },
+        EE: { GEN: 97.8, 'OBC-NCL': 94.5, SC: 85.0, ST: 78.0 },
+        ME: { GEN: 96.5, 'OBC-NCL': 92.5, SC: 81.0, ST: 74.0 },
+        CE: { GEN: 95.0, 'OBC-NCL': 90.0 }
+      }
+    },
+    {
+      id: 'COL-12', name: 'National Institute of Technology (NIT) Silchar', shortCode: 'NIT-SIL',
+      state: 'Assam', type: 'NIT', nirfRank: 40,
+      annualTuition: 125000, annualHostel: 38000,
+      counsellingBoard: 'JoSAA / CSAB',
+      cutoffs: {
+        CSE: { GEN: 96.8, 'OBC-NCL': 93.2, EWS: 94.0, SC: 84.0, ST: 76.0 },
+        ECE: { GEN: 93.5, 'OBC-NCL': 89.5, EWS: 90.5, SC: 78.0, ST: 70.0 },
+        EE: { GEN: 91.5, 'OBC-NCL': 86.5, SC: 74.0, ST: 66.0 },
+        ME: { GEN: 89.0, 'OBC-NCL': 83.5, SC: 70.0, ST: 62.0 },
+        CE: { GEN: 87.0, 'OBC-NCL': 81.0 }
+      }
+    },
+    {
+      id: 'COL-13', name: 'Indian Institute of Information Technology (IIIT) Guwahati', shortCode: 'IIIT-GHY',
+      state: 'Assam', type: 'IIIT', nirfRank: 85,
+      annualTuition: 225000, annualHostel: 48000,
+      counsellingBoard: 'JoSAA / CSAB',
+      cutoffs: {
+        CSE: { GEN: 97.0, 'OBC-NCL': 93.5, EWS: 94.2, SC: 84.0, ST: 75.0 },
+        ECE: { GEN: 94.5, 'OBC-NCL': 90.0, SC: 78.0 }
+      }
+    },
+    {
+      id: 'COL-14', name: 'Assam Engineering College (AEC) Jalukbari, Guwahati', shortCode: 'AEC-GHY',
+      state: 'Assam', type: 'State Govt', nirfRank: 130,
+      annualTuition: 18000, annualHostel: 14000,
+      counsellingBoard: 'DTE Assam / Assam CEE / JEE Main',
+      cutoffs: {
+        CSE: { GEN: 92.5, 'OBC-NCL': 86.0, EWS: 87.5, SC: 78.0, ST: 70.0 },
+        ECE: { GEN: 89.0, 'OBC-NCL': 82.0, SC: 73.0 },
+        EE: { GEN: 86.5, 'OBC-NCL': 78.0 },
+        ME: { GEN: 84.0, 'OBC-NCL': 75.0 },
+        CE: { GEN: 82.0, 'OBC-NCL': 72.0 }
+      }
+    },
+    {
+      id: 'COL-15', name: 'Jorhat Engineering College (JEC) Jorhat', shortCode: 'JEC-JRH',
+      state: 'Assam', type: 'State Govt', nirfRank: 145,
+      annualTuition: 18000, annualHostel: 14000,
+      counsellingBoard: 'DTE Assam / Assam CEE / JEE Main',
+      cutoffs: {
+        CSE: { GEN: 91.0, 'OBC-NCL': 84.5, EWS: 85.5, SC: 75.0, ST: 68.0 },
+        EE: { GEN: 85.0, 'OBC-NCL': 77.0, SC: 67.0 },
+        ME: { GEN: 83.0, 'OBC-NCL': 74.0 },
+        CE: { GEN: 80.5, 'OBC-NCL': 71.0 }
+      }
+    },
+    {
+      id: 'COL-16', name: 'Tezpur University, School of Engineering', shortCode: 'TU-SOE',
+      state: 'Assam', type: 'CFTI', nirfRank: 69,
+      annualTuition: 48000, annualHostel: 22000,
+      counsellingBoard: 'JoSAA / CSAB / TU Entrance',
+      cutoffs: {
+        CSE: { GEN: 94.5, 'OBC-NCL': 89.0, EWS: 90.0, SC: 80.0, ST: 72.0 },
+        ECE: { GEN: 91.0, 'OBC-NCL': 85.0, SC: 74.0 },
+        EE: { GEN: 88.0, 'OBC-NCL': 81.0 },
+        ME: { GEN: 85.0, 'OBC-NCL': 78.0 },
+        CE: { GEN: 83.0, 'OBC-NCL': 75.0 }
+      }
+    },
+    {
+      id: 'COL-17', name: 'Central Institute of Technology (CIT) Kokrajhar', shortCode: 'CIT-KKR',
+      state: 'Assam', type: 'CFTI', nirfRank: 180,
+      annualTuition: 42000, annualHostel: 20000,
+      counsellingBoard: 'JoSAA / CSAB / CIT Entrance',
+      cutoffs: {
+        CSE: { GEN: 89.0, 'OBC-NCL': 81.0, EWS: 82.5, SC: 72.0, ST: 65.0 },
+        ECE: { GEN: 85.0, 'OBC-NCL': 76.0 },
+        IT: { GEN: 87.0, 'OBC-NCL': 79.0 },
+        CE: { GEN: 80.0, 'OBC-NCL': 70.0 }
+      }
+    },
+    {
+      id: 'COL-18', name: 'Assam University, Triguna Sen School of Technology (TSSOT)', shortCode: 'AUS-TSSOT',
+      state: 'Assam', type: 'GFTI', nirfRank: 160,
+      annualTuition: 45000, annualHostel: 18000,
+      counsellingBoard: 'JoSAA / CSAB',
+      cutoffs: {
+        CSE: { GEN: 88.0, 'OBC-NCL': 80.0, EWS: 81.0, SC: 70.0, ST: 63.0 },
+        ECE: { GEN: 84.0, 'OBC-NCL': 75.0 },
+        CE: { GEN: 78.0, 'OBC-NCL': 68.0 }
+      }
+    },
+    {
+      id: 'COL-19', name: 'Bineswar Brahma Engineering College (BBEC) Kokrajhar', shortCode: 'BBEC-KKR',
+      state: 'Assam', type: 'State Govt', nirfRank: 220,
+      annualTuition: 20000, annualHostel: 14000,
+      counsellingBoard: 'DTE Assam / Assam CEE',
+      cutoffs: {
+        CSE: { GEN: 85.0, 'OBC-NCL': 77.0, EWS: 78.0, SC: 68.0, ST: 60.0 },
+        EE: { GEN: 80.0, 'OBC-NCL': 71.0 },
+        ME: { GEN: 78.0, 'OBC-NCL': 69.0 },
+        CE: { GEN: 76.0, 'OBC-NCL': 66.0 }
+      }
+    },
+    {
+      id: 'COL-20', name: 'Jorhat Institute of Science & Technology (JIST) Jorhat', shortCode: 'JIST-JRH',
+      state: 'Assam', type: 'State Govt', nirfRank: 230,
+      annualTuition: 20000, annualHostel: 14000,
+      counsellingBoard: 'DTE Assam / Assam CEE',
+      cutoffs: {
+        CSE: { GEN: 83.5, 'OBC-NCL': 75.0, EWS: 76.5, SC: 66.0, ST: 58.0 },
+        ECE: { GEN: 79.0, 'OBC-NCL': 70.0 },
+        ME: { GEN: 77.0, 'OBC-NCL': 68.0 },
+        CE: { GEN: 75.0, 'OBC-NCL': 65.0 }
+      }
+    },
+    {
+      id: 'COL-21', name: 'Barak Valley Engineering College (BVEC) Karimganj', shortCode: 'BVEC-KRG',
+      state: 'Assam', type: 'State Govt', nirfRank: 250,
+      annualTuition: 20000, annualHostel: 14000,
+      counsellingBoard: 'DTE Assam / Assam CEE',
+      cutoffs: {
+        CSE: { GEN: 81.0, 'OBC-NCL': 72.0, EWS: 74.0, SC: 63.0, ST: 55.0 },
+        ECE: { GEN: 77.0, 'OBC-NCL': 67.0 },
+        ME: { GEN: 74.0, 'OBC-NCL': 64.0 },
+        CE: { GEN: 72.0, 'OBC-NCL': 61.0 }
+      }
+    },
+    {
+      id: 'COL-22', name: 'Girijananda Chowdhury University (GCU) Guwahati', shortCode: 'GCU-GHY',
+      state: 'Assam', type: 'Private', nirfRank: 260,
+      annualTuition: 110000, annualHostel: 50000,
+      counsellingBoard: 'State / Direct / JEE Main',
+      cutoffs: {
+        CSE: { GEN: 72.0, 'OBC-NCL': 64.0, SC: 54.0, ST: 46.0 },
+        ECE: { GEN: 68.0, 'OBC-NCL': 60.0 },
+        EE: { GEN: 64.0, 'OBC-NCL': 56.0 },
+        ME: { GEN: 62.0, 'OBC-NCL': 54.0 },
+        CE: { GEN: 60.0, 'OBC-NCL': 52.0 }
+      }
     }
   ];
 }
@@ -390,6 +543,32 @@ function buildScholarshipsFromScraped(data, student) {
       incomeLimit: 250000,
       requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Aadhaar Card'],
       dataSource: enrichedText.includes('YASASVI') ? 'Anakin Scraped' : 'Base Data'
+    },
+    {
+      id: 'SCH-07',
+      name: 'Ishan Uday Special Scholarship for NER (Assam)',
+      provider: 'UGC / Ministry of Education (Govt. of India)',
+      annualAmount: 93600,
+      deadlineDate: '2026-10-31',
+      applicationUrl: 'https://scholarships.gov.in',
+      eligibleCategories: ['GEN', 'OBC-NCL', 'EWS', 'SC', 'ST'],
+      incomeLimit: 450000,
+      stateRestriction: 'Assam',
+      requiredDocuments: ['Income Certificate', 'Domicile / Residence Certificate', 'Class 12 Marksheet', 'Bank Passbook (First Page)', 'Aadhaar Card'],
+      dataSource: 'Base Data'
+    },
+    {
+      id: 'SCH-08',
+      name: 'Assam DHE Combined Merit Scholarship',
+      provider: 'Directorate of Higher Education, Govt. of Assam',
+      annualAmount: 24000,
+      deadlineDate: '2026-11-15',
+      applicationUrl: 'https://dhe-operations.assam.gov.in',
+      eligibleCategories: ['GEN', 'OBC-NCL', 'EWS', 'SC', 'ST'],
+      incomeLimit: 500000,
+      stateRestriction: 'Assam',
+      requiredDocuments: ['Income Certificate', 'Domicile / Residence Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
+      dataSource: 'Base Data'
     }
   ];
 
@@ -406,7 +585,7 @@ function buildScholarshipsFromScraped(data, student) {
     const checks = [
       { label: 'Category', passed: catMatch, explanation: catMatch ? `Your category (${cat}) is eligible` : `Your category (${cat}) does not qualify` },
       { label: 'Income', passed: incomeMatch, explanation: incomeMatch ? `Annual income ₹${income.toLocaleString('en-IN')} ≤ ₹${sch.incomeLimit.toLocaleString('en-IN')} limit` : `Annual income exceeds ₹${sch.incomeLimit.toLocaleString('en-IN')} limit` },
-      { label: 'State', passed: stateMatch, explanation: stateMatch ? (sch.stateRestriction ? `Jharkhand domicile confirmed` : 'No state restriction') : `This scholarship is for ${sch.stateRestriction} residents only` }
+      { label: 'State', passed: stateMatch, explanation: stateMatch ? (sch.stateRestriction ? `${sch.stateRestriction} domicile confirmed` : 'No state restriction') : `This scholarship is for ${sch.stateRestriction} residents only` }
     ];
 
     const isEligible = catMatch && incomeMatch && stateMatch;

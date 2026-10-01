@@ -381,6 +381,10 @@ function setupEventListeners() {
   if (btnAsha) {
     btnAsha.addEventListener('click', () => setPreset('Asha Kumar', 92.0, 'OBC-NCL', 'Jharkhand', 300000, 'CSE', 100000, 'btnPresetAsha'));
   }
+  const btnAssam = document.getElementById('btnPresetAssam');
+  if (btnAssam) {
+    btnAssam.addEventListener('click', () => setPreset('Priyakhi Kakoti', 89.0, 'OBC-NCL', 'Assam', 250000, 'CSE', 80000, 'btnPresetAssam'));
+  }
   const btnRahul = document.getElementById('btnPresetRahul');
   if (btnRahul) {
     btnRahul.addEventListener('click', () => setPreset('Rahul Verma', 97.0, 'GEN', 'Uttar Pradesh', 600000, 'CSE', 250000, 'btnPresetRahul'));
