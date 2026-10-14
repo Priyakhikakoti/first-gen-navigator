@@ -64,14 +64,14 @@
       </div>
       <nav class="main-nav">
         <a href="#profile-section" class="nav-link" id="nav-profile">Profile</a>
-        <a href="#colleges-section" class="nav-link" id="nav-colleges">Colleges</a>
-        <a href="#scholarships-section" class="nav-link" id="nav-scholarships">Scholarships</a>
-        <a href="#calculator-section" class="nav-link" id="nav-calculator">Affordability</a>
-        <a href="#documents-section" class="nav-link" id="nav-documents">Documents</a>
-        <a href="#readiness-section" class="nav-link" id="nav-readiness">Readiness</a>
-        <a href="#deadlines-section" class="nav-link" id="nav-deadlines">Deadlines</a>
+        <a href="#colleges-section" class="nav-link" id="nav-colleges" data-analysis-required hidden>Colleges</a>
+        <a href="#scholarships-section" class="nav-link" id="nav-scholarships" data-analysis-required hidden>Scholarships</a>
+        <a href="#calculator-section" class="nav-link" id="nav-calculator" data-analysis-required hidden>Affordability</a>
+        <a href="#documents-section" class="nav-link" id="nav-documents" data-analysis-required hidden>Documents</a>
+        <a href="#readiness-section" class="nav-link" id="nav-readiness" data-analysis-required hidden>Readiness</a>
+        <a href="#deadlines-section" class="nav-link" id="nav-deadlines" data-analysis-required hidden>Deadlines</a>
       </nav>
-      <div class="header-cta" id="headerCta">
+      <div class="header-cta" id="headerCta" data-analysis-required hidden>
         <button id="btnQuickRecalc" class="btn-secondary-sm" type="button">Refresh Matches</button>
         <button id="btnOpenCompareHeader" class="btn-primary-sm" type="button">
           <span>⚖️ Compare</span>
@@ -101,7 +101,7 @@
             <button class="preset-chip" id="btnPresetPriya">Priya Soren (Jharkhand, 78%ile, ST)</button>
           </div>
         </div>
-        <div class="hero-stats-card">
+        <div class="hero-stats-card" data-analysis-required hidden>
           <div class="stat-item">
             <div class="stat-number" id="statCollegesCount">10</div>
             <div class="stat-title">Target Colleges</div>
@@ -223,7 +223,7 @@
   </section>
 
   <!-- Section 2: College Options (Dream, Realistic, Safe) -->
-  <section id="colleges-section" class="section-wrapper bg-soft">
+  <section id="colleges-section" class="section-wrapper bg-soft" data-analysis-required hidden>
     <div class="container">
       <div class="section-header flex-between">
         <div>
@@ -258,7 +258,7 @@
   </section>
 
   <!-- Section 3: Scholarships & Eligibility Explanations -->
-  <section id="scholarships-section" class="section-wrapper bg-white">
+  <section id="scholarships-section" class="section-wrapper bg-white" data-analysis-required hidden>
     <div class="container">
       <div class="section-header">
         <div class="section-badge">Step 3</div>
@@ -273,7 +273,7 @@
   </section>
 
   <!-- Section 4: Smart Affordability Calculator -->
-  <section id="calculator-section" class="section-wrapper bg-soft">
+  <section id="calculator-section" class="section-wrapper bg-soft" data-analysis-required hidden>
     <div class="container">
       <div class="section-header">
         <div class="section-badge">Step 4</div>
@@ -341,7 +341,7 @@
   </section>
 
   <!-- Section 5: Alternative Pathways (Plan A / B / C) -->
-  <section id="alternatives-section" class="section-wrapper bg-white">
+  <section id="alternatives-section" class="section-wrapper bg-white" data-analysis-required hidden>
     <div class="container">
       <div class="section-header">
         <div class="section-badge">Step 5</div>
@@ -360,7 +360,7 @@
   </section>
 
   <!-- Section 4: Document Verification Vault -->
-  <section id="documents-section" class="section-wrapper bg-soft">
+  <section id="documents-section" class="section-wrapper bg-soft" data-analysis-required hidden>
     <div class="container">
       <div class="section-header flex-between">
         <div>
@@ -403,7 +403,7 @@
   </section>
 
   <!-- Section 5: Application Readiness Score & What Should I Do Next? -->
-  <section id="readiness-section" class="section-wrapper bg-white">
+  <section id="readiness-section" class="section-wrapper bg-white" data-analysis-required hidden>
     <div class="container">
       <div class="section-header">
         <div class="section-badge">Step 5</div>
@@ -482,7 +482,7 @@
   </section>
 
   <!-- Section 6: Admission Deadlines & Deadline Risk Monitoring -->
-  <section id="deadlines-section" class="section-wrapper bg-soft">
+  <section id="deadlines-section" class="section-wrapper bg-soft" data-analysis-required hidden>
     <div class="container">
       <div class="section-header flex-between">
         <div>
@@ -519,7 +519,7 @@
   </section>
 
   <!-- Section 8: My Admission Progress (Supabase-backed) -->
-  <section id="progress-section" class="section-wrapper bg-soft">
+  <section id="progress-section" class="section-wrapper bg-soft" data-analysis-required hidden>
     <div class="container">
       <div class="section-header flex-between">
         <div>

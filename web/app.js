@@ -413,35 +413,49 @@ async function handleAuthSession(user) {
   }
 
   state.authReady = true;
-  updateAuthUI(user);
-  if (initializedAuthUserId === user.id) return;
+  if (initializedAuthUserId === user.id) {
+    updateAuthUI(user);
+    return;
+  }
+  if (paymentPollTimer) window.clearInterval(paymentPollTimer);
+  paymentPollTimer = null;
+  paymentCheckInFlight = false;
+  pendingPaymentCallback = null;
+  state.student = null;
   initializedAuthUserId = user.id;
   state.activeAnalysisId = null;
-  const savedAnalysisId = sessionStorage.getItem(`fgn-pending-analysis:${user.id}`);
-  await startPaidAnalysis(async () => {
-    if (state.currentUser?.id !== user.id) return;
-    if (window.FGNDB) await syncProfileFromSupabase();
-    if (state.currentUser?.id !== user.id) return;
-    const savedProfile = getSavedPendingProfile(user.id);
-    if (savedProfile) {
-      state.student = savedProfile;
-      populateProfileForm(savedProfile);
-      updateHeroSummary(savedProfile);
-    }
+  state.pendingAnalysisId = null;
+  state.pendingPaymentQrCodeId = null;
+  updateAuthUI(user);
 
-    if (state.student) {
-      const profileResponse = await apiFetch(`${API_BASE}/api/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state.student)
-      });
-      if (!profileResponse.ok) throw new Error('Could not load your profile for this analysis.');
-    }
-    await loadAllData();
-    if (state.currentUser?.id !== user.id) return;
-    if (window.FGNDB) await syncDocumentsFromSupabase();
-    if (state.currentUser?.id === user.id) await loadProgress();
-  }, savedAnalysisId || createAnalysisId());
+  const savedProfile = getSavedPendingProfile(user.id);
+  const emptyProfile = {
+    name: user.user_metadata?.full_name || '',
+    jeePercentile: '',
+    category: 'OBC-NCL',
+    state: 'Jharkhand',
+    preferredBranch: 'CSE',
+    annualIncome: '',
+    annualBudget: ''
+  };
+  populateProfileForm(savedProfile || emptyProfile);
+  if (savedProfile) {
+    state.student = savedProfile;
+    updateHeroSummary(savedProfile);
+  }
+
+  if (window.FGNDB) {
+    syncProfileFromSupabase(user.id).then(() => {
+      if (state.currentUser?.id !== user.id) return;
+      if (savedProfile) {
+        state.student = savedProfile;
+        populateProfileForm(savedProfile);
+        updateHeroSummary(savedProfile);
+      }
+    }).catch(error => {
+      console.error('Could not load the saved profile:', error);
+    });
+  }
 }
 
 // ─── Global Event Listeners ───────────────────────────────────────────────────
@@ -2329,22 +2343,22 @@ function populateProfileForm(s) {
   if (nameEl) nameEl.value = s.name || '';
 
   const pctEl = document.getElementById('inputPercentile');
-  if (pctEl) pctEl.value = s.jeePercentile || 92;
+  if (pctEl) pctEl.value = s.jeePercentile ?? '';
 
   const catEl = document.getElementById('inputCategory');
-  if (catEl) catEl.value = s.category || 'OBC-NCL';
+  if (catEl) catEl.value = s.category ?? 'OBC-NCL';
 
   const stEl = document.getElementById('inputState');
-  if (stEl) stEl.value = s.state || 'Jharkhand';
+  if (stEl) stEl.value = s.state ?? 'Jharkhand';
 
   const brEl = document.getElementById('inputBranch');
-  if (brEl) brEl.value = s.preferredBranch || 'CSE';
+  if (brEl) brEl.value = s.preferredBranch ?? 'CSE';
 
   const incEl = document.getElementById('inputIncome');
-  if (incEl) incEl.value = s.annualIncome || 300000;
+  if (incEl) incEl.value = s.annualIncome ?? '';
 
   const budEl = document.getElementById('inputBudget');
-  if (budEl) budEl.value = s.annualBudget || 100000;
+  if (budEl) budEl.value = s.annualBudget ?? '';
 }
 
 function updateHeroSummary(s) {
@@ -2356,14 +2370,19 @@ function updateHeroSummary(s) {
 }
 
 async function saveProfile() {
+  if (!state.currentUser) {
+    openAuthGate();
+    return;
+  }
+
   const s = {
     name: document.getElementById('inputName')?.value || 'Asha Kumar',
-    jeePercentile: parseFloat(document.getElementById('inputPercentile')?.value) || 92.0,
+    jeePercentile: Number(document.getElementById('inputPercentile')?.value),
     category: document.getElementById('inputCategory')?.value || 'OBC-NCL',
     state: document.getElementById('inputState')?.value || 'Jharkhand',
     preferredBranch: document.getElementById('inputBranch')?.value || 'CSE',
-    annualIncome: parseInt(document.getElementById('inputIncome')?.value) || 300000,
-    annualBudget: parseInt(document.getElementById('inputBudget')?.value) || 100000
+    annualIncome: Number(document.getElementById('inputIncome')?.value),
+    annualBudget: Number(document.getElementById('inputBudget')?.value)
   };
 
   if (state.currentUser) {
@@ -2496,15 +2515,21 @@ function updateAuthUI(user) {
 
   if (user) {
     const hasPaidAnalysis = Boolean(state.activeAnalysisId);
-    if (appShell) appShell.hidden = !hasPaidAnalysis;
+    const paymentPending = Boolean(state.pendingAnalysisId);
+    if (appShell) appShell.hidden = paymentPending;
     if (authGate) authGate.hidden = true;
-    if (paymentGate) paymentGate.hidden = hasPaidAnalysis;
+    if (paymentGate) paymentGate.hidden = !paymentPending;
+    document.querySelectorAll('[data-analysis-required]').forEach(element => {
+      element.hidden = !hasPaidAnalysis;
+    });
     if (dot) dot.classList.add('logged-in');
     if (statusText) statusText.textContent = `Signed in as ${user.user_metadata?.full_name || user.email} — synced to cloud.`;
     if (btnLogin) btnLogin.style.display = 'none';
     if (btnSignup) btnSignup.style.display = 'none';
     if (btnSignOut) btnSignOut.style.display = '';
     if (progressPrompt) progressPrompt.style.display = 'none';
+    const paymentSignOut = document.getElementById('btnPaymentSignOut');
+    if (paymentSignOut) paymentSignOut.hidden = false;
   } else {
     if (appShell) appShell.hidden = true;
     if (authGate) authGate.hidden = false;
@@ -2515,6 +2540,9 @@ function updateAuthUI(user) {
     if (btnSignup) btnSignup.style.display = '';
     if (btnSignOut) btnSignOut.style.display = 'none';
     if (progressPrompt) progressPrompt.style.display = '';
+    document.querySelectorAll('[data-analysis-required]').forEach(element => {
+      element.hidden = true;
+    });
   }
 }
 
@@ -2716,8 +2744,7 @@ function setupAuthListeners() {
       try {
         const { error } = await window.FGNAuth.signOut();
         if (error) throw error;
-        initializedAuthUserId = null;
-        updateAuthUI(null);
+        await handleAuthSession(null);
       } catch (error) {
         console.error('Sign out failed:', error);
         showToast(error.message || 'Could not sign out. Please try again.');
@@ -2732,6 +2759,7 @@ function setupAuthListeners() {
       try {
         const { error } = await window.FGNAuth.signOut();
         if (error) throw error;
+        await handleAuthSession(null);
       } catch (error) {
         console.error('Sign out failed:', error);
         showToast(error.message || 'Could not sign out. Please try again.');
@@ -2914,9 +2942,10 @@ async function loadProgress() {
   });
 }
 
-async function syncProfileFromSupabase() {
+async function syncProfileFromSupabase(userId = state.currentUser?.id) {
   if (!state.currentUser || !window.FGNDB) return;
-  const { data } = await window.FGNDB.getProfile(state.currentUser.id);
+  const { data } = await window.FGNDB.getProfile(userId);
+  if (state.currentUser?.id !== userId) return;
   if (data) {
     state.student = {
       name: data.name,

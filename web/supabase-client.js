@@ -16,7 +16,7 @@ async function signUp(email, password, name) {
 async function signIn(email, password) {
   return await _supabase.auth.signInWithPassword({ email, password });
 }
-async function signOut() { return await _supabase.auth.signOut(); }
+async function signOut() { return await _supabase.auth.signOut({ scope: 'local' }); }
 async function getSession() { const { data } = await _supabase.auth.getSession(); return data?.session ?? null; }
 async function getUser() { const s = await getSession(); return s?.user ?? null; }
 async function getAccessToken() {

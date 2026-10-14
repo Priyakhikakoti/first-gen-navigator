@@ -111,16 +111,17 @@ Configure the deployed site URL and allowed redirect URLs in Supabase Auth setti
 
 ## Paid Analysis Checkout
 
-Each initial analysis, profile update/recalculation, and manual refresh requires a new ₹50 Razorpay UPI QR payment. The Node API verifies the signed-in Supabase user and confirms the exact ₹50 INR captured payment with Razorpay before granting analysis API access. Razorpay credentials and the Supabase service-role key are server-only.
+Each initial analysis, profile update/recalculation, and manual refresh requires a new ₹50 Razorpay UPI QR payment. Signing in only opens the profile screen; the QR is created after the user submits **Update Profile & Recalculate** (or explicitly starts a refresh). The Node API verifies the signed-in Supabase user and confirms the exact ₹50 INR captured payment with Razorpay before granting analysis API access. Razorpay credentials and the Supabase service-role key are server-only.
 
 1. Run `supabase/schema.sql` in the Supabase SQL Editor. This creates/migrates the `analysis_payments` ledger with owner-only read access; the server writes it using the service-role key. The migration expires old manual-review requests so they cannot grant paid access without a Razorpay-confirmed payment.
-2. Configure the following environment variables for local development and production:
+2. For local development, `.env` is gitignored and has been scaffolded in the project root. Fill it with the values below; use your **Razorpay test-mode** Key ID and Key Secret from Razorpay Dashboard → Account & Settings → API Keys. Do not paste secrets into source files or commit `.env`.
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` — keep private; never add it to browser code or commit it
    - `RAZORPAY_KEY_ID`
    - `RAZORPAY_KEY_SECRET` — keep private; never add it to browser code or commit it
-3. Configure these values in the Render service environment. Start with Razorpay test keys, then use live keys only after testing QR creation, payment capture, cancellation/expiry, and verification.
+3. Start locally with `npm run dev`, open `http://localhost:3001`, sign in, complete the profile, and submit **Update Profile & Recalculate** to generate the payment QR. Run `supabase/schema.sql` first. Test QR creation and the captured-payment verification with Razorpay test credentials; account activation does not automatically mean that UPI QR APIs are enabled, so contact Razorpay if QR creation is rejected.
+4. Configure the same Supabase values and Razorpay **live-mode** credentials in Render only after testing QR creation, payment capture, cancellation/expiry, and verification successfully.
 
 Do not use the static Google Pay QR for this flow. Razorpay creates a unique, fixed-amount QR per analysis, then the server verifies captured payments directly with Razorpay.
 
