@@ -3,7 +3,7 @@
  * 
  * Features:
  *  1. Document Vault -> Automated Document Verification (OCR + Classification + PII Masking + IndexedDB storage)
- *  2. College Matching -> Improved JEE CRL/Category Rank estimation, cutoff margins, and Dream/Realistic/Safe tiers
+ *  2. College Matching -> Percentile estimate comparisons, affordability, and Dream/Realistic/Safe tiers
  *  3. Scholarship Matching -> Unified view with deadline countdown, line-by-line criteria checks, and required documents
  *  4. Deadline System -> Live countdown calculation and missing-document deadline risk assessment
  *  5. Application Readiness Score -> 0-100% composite score gauge with breakdown and instant boosters
@@ -15,6 +15,7 @@
  */
 
 const API_BASE = '';
+let initializedAuthUserId = null;
 
 // ─── Global State ─────────────────────────────────────────────────────────────
 const state = {
@@ -42,6 +43,16 @@ const state = {
 function formatINR(num) {
   if (num === null || num === undefined || isNaN(num)) return '₹0';
   return '₹' + Math.round(num).toLocaleString('en-IN');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[character]);
 }
 
 function showToast(message) {
@@ -155,7 +166,7 @@ const FGN_DocStorage = {
 const DEFAULT_DOCUMENT_TEMPLATES = [
   { id: 'DOC-01', documentType: 'Income Certificate', fileName: null, status: 'Pending', issuer: 'Tehsildar / SDO / Revenue Officer', notes: 'Mandatory for fee waiver (TFW) and e-Kalyan / NSP scholarship disbursement.', critical: true },
   { id: 'DOC-02', documentType: 'Caste Certificate', fileName: null, status: 'Pending', issuer: 'District Magistrate / SDO Office', notes: 'Mandatory for OBC-NCL / SC / ST / EWS seat allotment.', critical: true },
-  { id: 'DOC-03', documentType: 'Domicile Certificate', fileName: null, status: 'Pending', issuer: 'Tehsildar / SDM Office', notes: 'Required to claim 50% Home State Quota seats at NITs and state government colleges.', critical: true },
+  { id: 'DOC-03', documentType: 'Domicile Certificate', fileName: null, status: 'Pending', issuer: 'Tehsildar / SDM Office', notes: 'May be required for home-state or state-counselling eligibility; verify the current rules for each institution.', critical: true },
   { id: 'DOC-04', documentType: 'JEE Scorecard', fileName: 'jee_main_scorecard.pdf', status: 'Verified', issuer: 'National Testing Agency (NTA)', notes: 'Paper 1 B.Tech official score certificate with All India Rank.', critical: true, detectedType: 'JEE Scorecard', confidence: 98, maskedPii: 'App No: ••••••••8412' },
   { id: 'DOC-05', documentType: 'Class 12 Marksheet', fileName: 'class12_marksheet.pdf', status: 'Verified', issuer: 'CBSE / State School Board', notes: 'Class 12 board marksheet verifying 75% aggregate or top 20 percentile eligibility.', critical: true, detectedType: 'Class 12 Marksheet', confidence: 95 },
   { id: 'DOC-06', documentType: 'Class 10 Marksheet', fileName: 'class10_marksheet.pdf', status: 'Verified', issuer: 'CBSE / ICSE / State Board', notes: 'Serves as primary legal date-of-birth proof across all counselling portals.', critical: false, detectedType: 'Class 10 Marksheet', confidence: 97 },
@@ -330,22 +341,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupAuthListeners();
   setupFlowScrollListener();
 
-  // Supabase Auth check
-  if (window.FGNAuth) {
-    const session = await window.FGNAuth.getSession();
-    const user = session?.user ?? null;
-    updateAuthUI(user);
+  document.addEventListener('fgn:authchange', event => {
+    const user = event.detail?.session?.user || null;
+    handleAuthSession(user).catch(error => {
+      console.error('Failed to update authenticated app state:', error);
+      initializedAuthUserId = null;
+      showAuthGateMessage('Could not load your account data. Please refresh and try again.');
+      updateAuthUI(null);
+    });
+  });
+
+  if (!window.FGNAuth) {
     state.authReady = true;
+    updateAuthUI(null);
+    showAuthGateMessage('Sign-in is unavailable because the Supabase client did not load. Check your connection and refresh the page.');
+    return;
   }
 
-  await loadAllData();
+  try {
+    const session = await window.FGNAuth.getSession();
+    state.authReady = true;
+    await handleAuthSession(session?.user || null);
+  } catch (error) {
+    console.error('Failed to check Supabase session:', error);
+    state.authReady = true;
+    updateAuthUI(null);
+    showAuthGateMessage('Could not verify your Supabase session. Check your connection and refresh the page.');
+  }
+});
 
-  if (state.currentUser && window.FGNDB) {
+async function handleAuthSession(user) {
+  state.authReady = true;
+  updateAuthUI(user);
+
+  if (!user) {
+    initializedAuthUserId = null;
+    return;
+  }
+
+  if (initializedAuthUserId === user.id) return;
+  initializedAuthUserId = user.id;
+
+  await loadAllData();
+  if (state.currentUser?.id !== user.id) return;
+  if (window.FGNDB) {
     await syncProfileFromSupabase();
     await syncDocumentsFromSupabase();
   }
-  await loadProgress();
-});
+  if (state.currentUser?.id === user.id) await loadProgress();
+}
 
 // ─── Global Event Listeners ───────────────────────────────────────────────────
 function setupEventListeners() {
@@ -743,12 +787,9 @@ function setupModalClosures() {
   if (closeCompare) closeCompare.addEventListener('click', () => document.getElementById('compareModal').classList.remove('open'));
   if (closeCompareFooter) closeCompareFooter.addEventListener('click', () => document.getElementById('compareModal').classList.remove('open'));
 
-  const closeAuth = document.getElementById('btnCloseAuthModal');
-  if (closeAuth) closeAuth.addEventListener('click', () => document.getElementById('authModal').classList.remove('open'));
-
   // Close modals on outside click
   window.addEventListener('click', (e) => {
-    ['whyMatchModal', 'uploadDocModal', 'docAuditModal', 'compareModal', 'authModal'].forEach(id => {
+    ['whyMatchModal', 'uploadDocModal', 'docAuditModal', 'compareModal'].forEach(id => {
       const modal = document.getElementById(id);
       if (modal && e.target === modal) {
         modal.classList.remove('open');
@@ -1072,7 +1113,7 @@ function runApplicationErrorChecks() {
     checks.push({
       severity: 'warning',
       icon: '🏛️',
-      headline: `Verify Domicile Certificate for 50% Home State Quota`,
+      headline: `Verify Domicile Certificate for Home State Eligibility`,
       explanation: `Students with ${stateName} domicile qualify for 50% state quota seats at ${stateName} NITs and state engineering colleges.`,
       actionLabel: 'Upload Domicile Certificate',
       actionTarget: 'Domicile Certificate'
@@ -1290,8 +1331,8 @@ function updateWhatNextActions() {
     priority: 'medium',
     tag: 'Target Choice',
     tagClass: 'tag-target',
-    title: 'Lock BIT Sindri (CSE) as Prime Safe Backup',
-    desc: `With your ${Number(s.jeePercentile || 92).toFixed(1)}%ile, Jharkhand Home State Quota gives >95% admission probability at ₹46,000 net cost.`,
+    title: 'Compare BIT Sindri (CSE) with Your Profile',
+    desc: `Compare your ${Number(s.jeePercentile || 92).toFixed(1)}%ile with the seeded estimate, then verify official JCECEB eligibility, current cutoffs, and fees before making choices.`,
     ctaText: 'View College Cutoffs',
     handler: () => {
       const el = document.getElementById('colleges-section');
@@ -1602,29 +1643,18 @@ async function loadColleges() {
 }
 
 function updateRankSummaryBanner() {
-  const pct = Number(state.student?.jeePercentile || 92.0);
   const cat = state.student?.category || 'OBC-NCL';
   const stateName = state.student?.state || 'Jharkhand';
-
-  // CRL Rank Formula (approx 14 Lakh total candidates in 2026)
-  const crl = Math.max(1, Math.round((100 - pct) * 14000));
-
-  // Category Rank Multiplier
-  let catRank = crl;
-  if (cat === 'OBC-NCL' || cat === 'OBC') catRank = Math.round(crl * 0.28);
-  else if (cat === 'EWS') catRank = Math.round(crl * 0.11);
-  else if (cat === 'SC') catRank = Math.round(crl * 0.15);
-  else if (cat === 'ST') catRank = Math.round(crl * 0.075);
 
   const valCrl = document.getElementById('valCrlRank');
   const valCat = document.getElementById('valCatRank');
   const valCatName = document.getElementById('valCatName');
   const valHs = document.getElementById('valHomeStateQuota');
 
-  if (valCrl) valCrl.textContent = `~${crl.toLocaleString('en-IN')}`;
-  if (valCat) valCat.textContent = `~${catRank.toLocaleString('en-IN')}`;
+  if (valCrl) valCrl.textContent = 'Use official scorecard';
+  if (valCat) valCat.textContent = 'Use official scorecard';
   if (valCatName) valCatName.textContent = cat;
-  if (valHs) valHs.textContent = `${stateName} (50% Quota Benefit)`;
+  if (valHs) valHs.textContent = `${stateName} (check official quota rules)`;
 }
 
 function renderColleges() {
@@ -1650,9 +1680,9 @@ function renderColleges() {
     const collegeId = c.id || c.collegeId;
     const collegeName = c.name || c.collegeName;
     const collegeType = c.type || c.instituteType || 'Institute';
-    const nirf = c.nirfRank || 0;
+    const nirf = c.nirfRank || null;
     const branch = c.branch || 'CSE';
-    const cutoff = c.effectiveCutoff || c.cutoffPercentile || 85;
+    const cutoff = c.effectiveCutoff ?? c.cutoffPercentile;
     const isHs = c.isHomeState || c.isHomeStateEligible;
     const board = c.counsellingBoard || 'JoSAA / State';
 
@@ -1663,15 +1693,12 @@ function renderColleges() {
     const netCost = aff.estimatedNetCost !== undefined ? aff.estimatedNetCost : (tuition + hostel - scholarship);
     const tierName = aff.affordabilityTier || 'Affordable';
 
-    const hsBadge = isHs ? `<span class="badge-home-state">Home State Quota</span>` : '';
+    const hsBadge = isHs ? `<span class="badge-home-state">Home State Match</span>` : '';
 
     const studentPct = state.student ? Number(state.student.jeePercentile) : 92;
     const diff = (studentPct - cutoff).toFixed(1);
     const diffSign = diff >= 0 ? `+${diff}` : `${diff}`;
     const diffColor = diff >= 0 ? 'var(--color-emerald)' : 'var(--color-rose)';
-
-    // Estimated Closing Rank for this cutoff
-    const closingRankEst = Math.max(1, Math.round((100 - cutoff) * 14000));
 
     let badgeClass = 'tier-affordable';
     if (tierName.includes('Highly')) badgeClass = 'tier-highly-affordable';
@@ -1679,6 +1706,23 @@ function renderColleges() {
     else if (tierName.includes('Not')) badgeClass = 'tier-not-affordable';
 
     const isCompared = state.selectedCompareColleges.some(col => col.id === collegeId);
+    const references = (c.sourceReferences || []).filter(reference => {
+      try {
+        return new URL(reference.url).protocol === 'https:';
+      } catch {
+        return false;
+      }
+    });
+    const referenceMarkup = references.length
+      ? `<ul class="college-source-list">${references.map(reference =>
+        `<li><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(reference.title || reference.url)}</a></li>`
+      ).join('')}</ul>`
+      : '<p class="college-source-empty">No college-specific source links were found in the latest scrape.</p>';
+    const rankMarkup = nirf ? `<span>Seeded NIRF rank #${nirf}</span>` : '<span>NIRF rank unavailable</span>';
+    const categoryBasis = c.cutoffCategory || 'unavailable';
+    const fallbackNotice = c.requestedBranch && c.requestedBranch !== branch
+      ? `Preferred branch ${escapeHtml(c.requestedBranch)} is not listed; showing ${escapeHtml(branch)} instead.`
+      : '';
 
     card.innerHTML = `
       <div class="card-top">
@@ -1688,25 +1732,26 @@ function renderColleges() {
           </div>
           ${hsBadge}
         </div>
-        <h3 class="college-title">${collegeName}</h3>
+        <h3 class="college-title">${escapeHtml(collegeName)}</h3>
         <div class="college-meta">
-          <span>Location: ${c.state}</span>
-          <span>NIRF Rank #${nirf}</span>
-          <span>Board: ${board}</span>
+          <span>Location: ${escapeHtml(c.state)}</span>
+          ${rankMarkup}
+          <span>Board: ${escapeHtml(board)}</span>
         </div>
       </div>
 
       <div class="card-cutoff-block">
         <div class="cutoff-comparison">
-          <span>Closing for <strong>${branch}</strong>:</span>
-          <span class="cutoff-num">${cutoff.toFixed(1)}%ile (CRL ~${closingRankEst.toLocaleString('en-IN')})</span>
+          <span>Seeded estimate for <strong>${escapeHtml(branch)}</strong> / ${escapeHtml(categoryBasis)}:</span>
+          <span class="cutoff-num">${cutoff.toFixed(1)}%ile</span>
         </div>
+        <div class="cutoff-advantage-text">${escapeHtml(c.cutoffBasis || 'Cutoff basis unavailable')}</div>
         <div class="cutoff-bar-bg">
           <div class="cutoff-bar-fill" style="width: ${Math.min(cutoff, 100)}%; background: ${diffColor};"></div>
         </div>
         <div class="cutoff-advantage-text">
           Your score: <strong>${studentPct.toFixed(1)}%ile</strong> 
-          (<span style="color: ${diffColor}; font-weight: 700;">${diffSign}%ile margin</span>)
+          (<span style="color: ${diffColor}; font-weight: 700;">${diffSign}%ile vs. estimate</span>)
         </div>
       </div>
 
@@ -1740,6 +1785,19 @@ function renderColleges() {
           </button>
         </div>
       </div>
+      <details class="college-analysis">
+        <summary>Analysis, data notes & sources</summary>
+        <div class="college-analysis-content">
+          ${fallbackNotice ? `<p class="college-data-warning">${fallbackNotice}</p>` : ''}
+          <p><strong>Match:</strong> ${Math.abs(Number(diff))}%ile ${Number(diff) >= 0 ? 'above' : 'below'} the local estimate. The Dream / Realistic / Safe tier is a heuristic, not an admission probability.</p>
+          <p><strong>Quota:</strong> ${isHs ? 'Your home state matches this institution; actual seat allocation depends on the current counselling rules and seat matrix.' : 'No home-state match indicated for this profile.'}</p>
+          <p><strong>Branches in local dataset:</strong> ${escapeHtml((c.availableBranches || []).join(', ') || 'Not available')}</p>
+          <p><strong>Data quality:</strong> Fees, NIRF rank and cutoff values are seeded estimates and have not been verified from the linked pages. Cutoff comparison uses percentile data and is not an official JoSAA closing rank.</p>
+          <p><strong>Latest scrape:</strong> ${c.dataUpdatedAt ? escapeHtml(new Date(c.dataUpdatedAt).toLocaleString()) : 'No scrape timestamp available'}</p>
+          <p><strong>Scraped references (discovery links, not fact verification):</strong></p>
+          ${referenceMarkup}
+        </div>
+      </details>
     `;
 
     container.appendChild(card);
@@ -1770,11 +1828,11 @@ function updateTierTip() {
   if (!tipText) return;
   const current = state.currentTier.toLowerCase();
   if (current === 'realistic') {
-    tipText.textContent = 'Realistic colleges are your prime target matches where your rank has a very strong admission probability.';
+    tipText.textContent = 'Realistic matches are heuristic comparisons against locally seeded percentile estimates, not admission probabilities. Verify current cutoffs with the counselling authority.';
   } else if (current === 'dream') {
-    tipText.textContent = 'Dream colleges are aspirational reach targets where you can compete during late rounds or CSAB special rounds.';
+    tipText.textContent = 'Dream matches are below the local percentile estimate. They are not predictions of late-round or CSAB outcomes; check official round-wise closing ranks.';
   } else {
-    tipText.textContent = 'Safe colleges are your high-probability safety net where your marks are well above past closing cutoffs.';
+    tipText.textContent = 'Safe matches are heuristic comparisons above the local estimate, not guaranteed or high-probability seats. Confirm eligibility and official cutoffs.';
   }
 }
 
@@ -2378,6 +2436,8 @@ function applyTranslations() {
 // ─── Auth Listeners & UI Helpers ──────────────────────────────────────────────
 function updateAuthUI(user) {
   state.currentUser = user;
+  const appShell = document.getElementById('appShell');
+  const authGate = document.getElementById('authGate');
   const dot = document.getElementById('authIndicatorDot');
   const statusText = document.getElementById('authStatusText');
   const btnLogin = document.getElementById('btnOpenLogin');
@@ -2386,6 +2446,8 @@ function updateAuthUI(user) {
   const progressPrompt = document.getElementById('progressLoginPrompt');
 
   if (user) {
+    if (appShell) appShell.hidden = false;
+    if (authGate) authGate.hidden = true;
     if (dot) dot.classList.add('logged-in');
     if (statusText) statusText.textContent = `Signed in as ${user.user_metadata?.full_name || user.email} — synced to cloud.`;
     if (btnLogin) btnLogin.style.display = 'none';
@@ -2393,8 +2455,10 @@ function updateAuthUI(user) {
     if (btnSignOut) btnSignOut.style.display = '';
     if (progressPrompt) progressPrompt.style.display = 'none';
   } else {
+    if (appShell) appShell.hidden = true;
+    if (authGate) authGate.hidden = false;
     if (dot) dot.classList.remove('logged-in');
-    if (statusText) statusText.textContent = 'Not signed in — your data is stored locally in IndexedDB.';
+    if (statusText) statusText.textContent = 'Not signed in.';
     if (btnLogin) btnLogin.style.display = '';
     if (btnSignup) btnSignup.style.display = '';
     if (btnSignOut) btnSignOut.style.display = 'none';
@@ -2402,56 +2466,126 @@ function updateAuthUI(user) {
   }
 }
 
+function showAuthFormMessage(elementId, message, success = false) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  element.textContent = message;
+  element.classList.toggle('auth-success', success);
+  element.style.display = '';
+}
+
+function clearAuthFormMessage(elementId) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  element.textContent = '';
+  element.classList.remove('auth-success');
+  element.style.display = 'none';
+}
+
+function showAuthGateMessage(message) {
+  const element = document.getElementById('authGateConnection');
+  if (element) element.textContent = message;
+}
+
 function setupAuthListeners() {
   const btnLogin = document.getElementById('btnOpenLogin');
   const btnSignup = document.getElementById('btnOpenSignup');
   const btnSignOut = document.getElementById('btnSignOut');
-  const authModal = document.getElementById('authModal');
 
-  if (btnLogin) btnLogin.addEventListener('click', () => { switchAuthTab('login'); authModal?.classList.add('open'); });
-  if (btnSignup) btnSignup.addEventListener('click', () => { switchAuthTab('signup'); authModal?.classList.add('open'); });
+  if (btnLogin) btnLogin.addEventListener('click', () => switchAuthTab('login'));
+  if (btnSignup) btnSignup.addEventListener('click', () => switchAuthTab('signup'));
 
   if (btnSignOut && window.FGNAuth) {
     btnSignOut.addEventListener('click', async () => {
-      await window.FGNAuth.signOut();
-      updateAuthUI(null);
-      showToast('Signed out. Local session remains preserved in browser.');
+      btnSignOut.disabled = true;
+      try {
+        const { error } = await window.FGNAuth.signOut();
+        if (error) throw error;
+        initializedAuthUserId = null;
+        updateAuthUI(null);
+      } catch (error) {
+        console.error('Sign out failed:', error);
+        showToast(error.message || 'Could not sign out. Please try again.');
+      } finally {
+        btnSignOut.disabled = false;
+      }
     });
   }
 
   const loginForm = document.getElementById('loginForm');
-  if (loginForm && window.FGNAuth) {
+  if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('loginEmail')?.value;
-      const pass = document.getElementById('loginPassword')?.value;
-      const res = await window.FGNAuth.signIn(email, pass);
-      if (res?.error) {
-        showToast(res.error.message || 'Login failed.');
-      } else {
-        authModal?.classList.remove('open');
-        updateAuthUI(res.data.user);
-        showToast('Successfully signed in.');
-        await syncProfileFromSupabase();
-        await syncDocumentsFromSupabase();
-        await loadProgress();
+      clearAuthFormMessage('loginError');
+      const submit = document.getElementById('btnLogin');
+      if (!window.FGNAuth) {
+        showAuthFormMessage('loginError', 'Sign-in is unavailable because the Supabase client did not load.');
+        return;
+      }
+
+      submit.disabled = true;
+      submit.textContent = 'Signing in...';
+      try {
+        const email = document.getElementById('loginEmail')?.value;
+        const password = document.getElementById('loginPassword')?.value;
+        const result = await window.FGNAuth.signIn(email, password);
+        if (result.error) {
+          showAuthFormMessage('loginError', result.error.message || 'Sign in failed.');
+          return;
+        }
+        if (!result.data?.user) {
+          showAuthFormMessage('loginError', 'Supabase did not return a signed-in user. Please try again.');
+          return;
+        }
+
+        await handleAuthSession(result.data.user);
+      } catch (error) {
+        console.error('Sign in failed:', error);
+        showAuthFormMessage('loginError', error.message || 'Sign in failed. Please try again.');
+      } finally {
+        submit.disabled = false;
+        submit.textContent = 'Sign In →';
       }
     });
   }
 
   const signupForm = document.getElementById('signupForm');
-  if (signupForm && window.FGNAuth) {
+  if (signupForm) {
     signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('signupName')?.value;
-      const email = document.getElementById('signupEmail')?.value;
-      const pass = document.getElementById('signupPassword')?.value;
-      const res = await window.FGNAuth.signUp(email, pass, name);
-      if (res?.error) {
-        showToast(res.error.message || 'Signup failed.');
-      } else {
-        authModal?.classList.remove('open');
-        showToast('Account created. Check email if confirmation is enabled.');
+      clearAuthFormMessage('signupError');
+      const submit = document.getElementById('btnSignup');
+      if (!window.FGNAuth) {
+        showAuthFormMessage('signupError', 'Account creation is unavailable because the Supabase client did not load.');
+        return;
+      }
+
+      submit.disabled = true;
+      submit.textContent = 'Creating account...';
+      try {
+        const name = document.getElementById('signupName')?.value?.trim();
+        const email = document.getElementById('signupEmail')?.value?.trim();
+        const password = document.getElementById('signupPassword')?.value;
+        const result = await window.FGNAuth.signUp(email, password, name);
+        if (result.error) {
+          showAuthFormMessage('signupError', result.error.message || 'Account creation failed.');
+          return;
+        }
+
+        if (result.data?.user && result.data?.session) {
+          await handleAuthSession(result.data.user);
+          return;
+        }
+
+        document.getElementById('signupPassword').value = '';
+        showAuthFormMessage('signupError', 'Account created. Check your email to confirm your address, then sign in.', true);
+      }
+      catch (error) {
+        console.error('Account creation failed:', error);
+        showAuthFormMessage('signupError', error.message || 'Account creation failed. Please try again.');
+      } finally {
+        submit.disabled = false;
+        submit.textContent = 'Create Account →';
       }
     });
   }
@@ -2462,17 +2596,37 @@ window.switchAuthTab = function(tab) {
   const signupForm = document.getElementById('signupForm');
   const tabLogin = document.getElementById('tabLogin');
   const tabSignup = document.getElementById('tabSignup');
+  const title = document.getElementById('authGateTitle');
+  const subtitle = document.getElementById('authGateSubtitle');
+  clearAuthFormMessage('loginError');
+  clearAuthFormMessage('signupError');
   if (tab === 'login') {
     if (loginForm) loginForm.style.display = '';
     if (signupForm) signupForm.style.display = 'none';
     if (tabLogin) tabLogin.classList.add('active');
     if (tabSignup) tabSignup.classList.remove('active');
+    if (tabLogin) tabLogin.setAttribute('aria-selected', 'true');
+    if (tabSignup) tabSignup.setAttribute('aria-selected', 'false');
+    if (title) title.textContent = 'Welcome back';
+    if (subtitle) subtitle.textContent = 'Sign in to continue to First Gen Navigator.';
   } else {
     if (loginForm) loginForm.style.display = 'none';
     if (signupForm) signupForm.style.display = '';
     if (tabLogin) tabLogin.classList.remove('active');
     if (tabSignup) tabSignup.classList.add('active');
+    if (tabLogin) tabLogin.setAttribute('aria-selected', 'false');
+    if (tabSignup) tabSignup.setAttribute('aria-selected', 'true');
+    if (title) title.textContent = 'Create your account';
+    if (subtitle) subtitle.textContent = 'Sign up to save your profile and admission progress.';
   }
+};
+
+window.openAuthGate = function() {
+  const appShell = document.getElementById('appShell');
+  const authGate = document.getElementById('authGate');
+  if (appShell) appShell.hidden = true;
+  if (authGate) authGate.hidden = false;
+  switchAuthTab('login');
 };
 
 async function loadProgress() {
@@ -2513,8 +2667,7 @@ async function loadProgress() {
     `;
     card.addEventListener('click', async () => {
       if (!state.currentUser) {
-        document.getElementById('authModal')?.classList.add('open');
-        showToast('Sign in to save your admission progress.');
+        openAuthGate();
         return;
       }
       step.completed = !step.completed;

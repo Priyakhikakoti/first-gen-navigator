@@ -19,12 +19,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
+  <div id="appShell" hidden>
   <!-- Auth Status Bar -->
   <div class="auth-status-bar" id="authStatusBar">
     <div class="container auth-bar-inner">
       <div class="auth-bar-left">
         <span class="auth-indicator" id="authIndicatorDot"></span>
-        <span id="authStatusText">Not signed in — your data is stored locally only.</span>
+        <span id="authStatusText">Checking sign-in status...</span>
       </div>
       <div class="auth-bar-right">
         <button class="auth-btn-outline" id="btnOpenLogin">Sign In</button>
@@ -273,7 +274,7 @@
         <div>
           <div class="section-badge">Step 2</div>
           <h2 class="section-title">Institutional Matches</h2>
-          <p class="section-subtitle" id="collegesSubtext">Classified using past closing ranks, category relaxations, and home-state quota advantages.</p>
+          <p class="section-subtitle" id="collegesSubtext">Compare your profile with the local estimates, review affordability, and follow source links. Current cutoffs and fees are not yet verified against official data.</p>
         </div>
         <!-- Tier Navigation Tabs -->
         <div class="tier-tabs">
@@ -291,7 +292,7 @@
 
       <!-- Explanatory Tip Banner -->
       <div class="info-alert-banner" id="tierTipBanner">
-        <span id="tierTipText">Realistic colleges are your prime target matches where your rank has a very strong admission probability.</span>
+        <span id="tierTipText">These tiers are heuristic comparisons against seeded estimates, not admission probabilities. Verify current details with official counselling sources.</span>
       </div>
 
       <!-- College Cards Container -->
@@ -572,7 +573,7 @@
           <p class="section-subtitle">Track your key milestones. Sign in to save progress across devices.</p>
         </div>
         <div id="progressLoginPrompt" class="progress-login-cta" style="display:none;">
-          <button class="btn-primary" onclick="document.getElementById('authModal').classList.add('open');">Sign In to Save Progress</button>
+          <button class="btn-primary" onclick="openAuthGate();">Sign In to Save Progress</button>
         </div>
       </div>
       <div class="progress-steps-grid" id="progressStepsGrid">
@@ -740,68 +741,76 @@
 
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
+  </div>
 
-  <!-- Auth Modal: Login / Signup -->
-  <div class="modal-backdrop" id="authModal">
-    <div class="modal-dialog auth-modal-dialog">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3 class="modal-title" id="authModalTitle">Sign In to First Gen Navigator</h3>
-          <p class="auth-modal-sub" id="authModalSub">Your progress, profile, and documents saved securely.</p>
-        </div>
-        <button class="modal-close" id="btnCloseAuthModal">&times;</button>
+  <!-- Authentication gate: the application shell stays hidden until Supabase confirms a session. -->
+  <main class="auth-gate" id="authGate">
+    <section class="auth-gate-intro">
+      <a class="auth-gate-brand" href="#" aria-label="First Gen Navigator home">
+        <span class="brand-symbol">FGN</span>
+        <span class="brand-text">
+          <span class="brand-title">FIRST GEN NAVIGATOR</span>
+          <span class="brand-sub">Your path to college, simplified.</span>
+        </span>
+      </a>
+      <div class="auth-gate-message">
+        <span class="auth-gate-eyebrow">Your next chapter starts here</span>
+        <h1>Make your college journey clearer.</h1>
+        <p>Sign in to explore college matches, understand costs and scholarships, and keep your admission plan in one place.</p>
+        <ul class="auth-gate-benefits">
+          <li><span aria-hidden="true">&#10003;</span> College and affordability comparisons</li>
+          <li><span aria-hidden="true">&#10003;</span> A personal admission progress tracker</li>
+          <li><span aria-hidden="true">&#10003;</span> Your profile synced to your account</li>
+        </ul>
       </div>
-      <div class="modal-body auth-modal-body">
-        <!-- Tab Toggle -->
-        <div class="auth-tab-toggle">
-          <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</button>
-          <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Create Account</button>
+      <p class="auth-gate-footnote">Built to make higher education information easier to navigate.</p>
+    </section>
+
+    <section class="auth-gate-form-panel" aria-labelledby="authGateTitle">
+      <div class="auth-gate-form-wrap">
+        <h2 id="authGateTitle">Welcome back</h2>
+        <p class="auth-gate-subtitle" id="authGateSubtitle">Sign in to continue to First Gen Navigator.</p>
+        <div class="auth-gate-connection" id="authGateConnection" role="status" aria-live="polite"></div>
+
+        <div class="auth-tab-toggle" role="tablist" aria-label="Account access">
+          <button class="auth-tab active" id="tabLogin" type="button" role="tab" aria-selected="true" aria-controls="loginForm" onclick="switchAuthTab('login')">Sign In</button>
+          <button class="auth-tab" id="tabSignup" type="button" role="tab" aria-selected="false" aria-controls="signupForm" onclick="switchAuthTab('signup')">Create Account</button>
         </div>
 
-        <!-- Login Form -->
-        <form id="loginForm" class="auth-form">
+        <form id="loginForm" class="auth-form" role="tabpanel" aria-labelledby="tabLogin">
           <div class="form-group">
             <label for="loginEmail">Email Address</label>
-            <input type="email" id="loginEmail" required placeholder="your@email.com" />
+            <input type="email" id="loginEmail" required autocomplete="email" placeholder="your@email.com" />
           </div>
           <div class="form-group">
             <label for="loginPassword">Password</label>
-            <input type="password" id="loginPassword" required placeholder="Your password" />
+            <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Your password" />
           </div>
-          <div class="auth-error" id="loginError" style="display:none;"></div>
+          <div class="auth-error" id="loginError" role="alert" style="display:none;"></div>
           <button type="submit" class="btn-primary auth-submit-btn" id="btnLogin">Sign In &rarr;</button>
         </form>
 
-        <!-- Signup Form -->
-        <form id="signupForm" class="auth-form" style="display:none;">
+        <form id="signupForm" class="auth-form" role="tabpanel" aria-labelledby="tabSignup" style="display:none;">
           <div class="form-group">
             <label for="signupName">Full Name</label>
-            <input type="text" id="signupName" required placeholder="e.g. Asha Kumar" />
+            <input type="text" id="signupName" required autocomplete="name" placeholder="e.g. Asha Kumar" />
           </div>
           <div class="form-group">
             <label for="signupEmail">Email Address</label>
-            <input type="email" id="signupEmail" required placeholder="your@email.com" />
+            <input type="email" id="signupEmail" required autocomplete="email" placeholder="your@email.com" />
           </div>
           <div class="form-group">
             <label for="signupPassword">Password (min. 6 characters)</label>
-            <input type="password" id="signupPassword" required minlength="6" placeholder="Create a password" />
+            <input type="password" id="signupPassword" required minlength="6" autocomplete="new-password" placeholder="Create a password" />
           </div>
-          <div class="auth-error" id="signupError" style="display:none;"></div>
+          <div class="auth-error" id="signupError" role="alert" style="display:none;"></div>
           <button type="submit" class="btn-primary auth-submit-btn" id="btnSignup">Create Account &rarr;</button>
         </form>
 
-        <div class="auth-divider">
-          <span>Your data is encrypted and stored securely on Supabase.</span>
-        </div>
-
-        <div class="auth-benefits">
-          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Profile saved across all devices</div>
-          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Document vault persisted securely</div>
-          <div class="auth-benefit-item"><span class="benefit-icon">&#10003;</span> Admission progress tracked &amp; synced</div>
-        </div>
+        <p class="auth-gate-privacy">Your account is authenticated by Supabase. Never share your password with anyone.</p>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
   <script src="supabase-client.js"></script>
   <script src="app.js"></script>

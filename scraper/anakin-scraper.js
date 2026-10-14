@@ -171,6 +171,56 @@ function searchRes(s) {
   return s.results[0].snippet?.substring(0, 100) + '...';
 }
 
+function collectCollegeReferences(raw, collegeSearchResults = []) {
+  const searchResults = [
+    ...(raw.nirf?.searchResults || []),
+    ...(raw.josaa?.searchResults || []),
+    ...(raw.nitJsr?.searchResults || []),
+    ...(raw.bitMesra?.searchResults || []),
+    ...collegeSearchResults
+  ];
+  const colleges = [
+    { id: 'COL-01', aliases: ['NIT Jamshedpur', 'NIT-JSR', 'NIT JSR'] },
+    { id: 'COL-02', aliases: ['BIT Sindri', 'BIT-SINDRI'] },
+    { id: 'COL-03', aliases: ['BIT Mesra', 'BIT-MESRA'] },
+    { id: 'COL-04', aliases: ['IIIT Ranchi', 'IIIT-RNC'] },
+    { id: 'COL-05', aliases: ['NIT Patna', 'NIT-PAT'] },
+    { id: 'COL-06', aliases: ['NIT Durgapur', 'NIT-DGP'] }
+  ];
+  const references = {};
+
+  for (const college of colleges) {
+    const aliases = college.aliases.map(alias => alias.toLowerCase());
+    const matches = searchResults.filter(result => {
+      const searchable = `${result.title || ''} ${result.snippet || ''} ${result.url || ''}`.toLowerCase();
+      return aliases.some(alias => searchable.includes(alias));
+    });
+    references[college.id] = matches
+      .filter(result => result.url && /^https:\/\//i.test(result.url))
+      .map(result => ({
+        title: result.title || result.url,
+        url: result.url,
+        snippet: result.snippet || '',
+        retrievedAt: raw.scrapedAt
+      }))
+      .filter((reference, index, all) => all.findIndex(item => item.url === reference.url) === index)
+      .slice(0, 5);
+  }
+
+  const officialPages = [
+    { id: 'COL-01', title: 'NIT Jamshedpur official website', url: 'https://www.nitjsr.ac.in' },
+    { id: 'COL-03', title: 'BIT Mesra official website', url: 'https://www.bitmesra.ac.in' }
+  ];
+  for (const page of officialPages) {
+    const refs = references[page.id];
+    if (!refs.some(reference => reference.url === page.url)) {
+      refs.unshift({ title: page.title, url: page.url, snippet: '', retrievedAt: raw.scrapedAt });
+    }
+  }
+
+  return references;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n══════════════════════════════════════════════════');
@@ -182,7 +232,7 @@ async function main() {
     process.exit(1);
   }
 
-  log('Init', `API Key: ${process.env.ANAKIN_API_KEY.substring(0, 12)}...`);
+  log('Init', 'Anakin API key configured.');
 
   const results = {};
 
@@ -274,6 +324,7 @@ async function generateEnrichedData(raw) {
   const enrichedPath = path.join(__dirname, '..', 'scraper', 'enriched-data.json');
   const enriched = {
     colleges: enrichedColleges,
+    collegeReferences: collectCollegeReferences(raw, enrichedColleges?.searchResults),
     scholarships: enrichedScholarships,
     jee: raw.jee,
     nitJsrMarkdown: raw.nitJsr?.markdown?.substring(0, 5000) || '',
@@ -282,7 +333,8 @@ async function generateEnrichedData(raw) {
     josaaSearchText: raw.josaa?.searchText || '',
     nspSearchText: raw.nsp?.searchText || '',
     ekalyanSearchText: raw.ekalyan?.searchText || '',
-    enrichedAt: new Date().toISOString()
+    enrichedAt: new Date().toISOString(),
+    dataQualityNote: 'References are discovery links only. They do not verify seeded fee, cutoff, or ranking values.'
   };
 
   fs.writeFileSync(enrichedPath, JSON.stringify(enriched, null, 2), 'utf8');

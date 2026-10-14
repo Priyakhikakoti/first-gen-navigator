@@ -2,7 +2,7 @@
  * First Gen Navigator — Anakin-Powered Proxy Server
  * ===================================================
  * A lightweight Express server that:
- *  1. Serves real scraped data from Anakin (enriched-data.json / scraped-data.json)
+ *  1. Serves seeded college data with scraped source references when available
  *  2. Falls back gracefully to the Java backend at PORT 8080 if available
  *  3. Exposes /api/* endpoints that the frontend app.js already calls
  *  4. Supports live re-scraping via POST /api/refresh
@@ -49,28 +49,32 @@ function loadEnrichedData() {
 }
 
 function buildCollegesFromScraped(data, student) {
-  // Base colleges seeded from project (always present, enriched with scraped data)
   const baseColleges = getBaseColleges();
-  if (!data || !student) return buildTieredResponse(baseColleges, student || defaultStudent());
-
-  // Enrich NIRF ranks from scraped content
-  const enrichedText = data.colleges?.summary || '';
-  baseColleges.forEach(c => {
-    // Try to extract updated fee info from scraped text
-    if (enrichedText.includes(c.shortCode) || enrichedText.toLowerCase().includes(c.name.toLowerCase().substring(0, 15))) {
-      // Mark as enriched with real data
-      c.dataSource = 'Anakin Scraped (Live)';
-    }
-  });
-
-  return buildTieredResponse(baseColleges, student);
+  return buildTieredResponse(baseColleges, student || defaultStudent(), data);
 }
 
 function defaultStudent() {
   return { name: 'Asha Kumar', jeePercentile: 92.0, category: 'OBC-NCL', state: 'Jharkhand', preferredBranch: 'CSE', annualIncome: 300000, annualBudget: 100000 };
 }
 
-function buildTieredResponse(colleges, student) {
+function resolveCutoff(college, branch, category) {
+  const cutoffs = college.cutoffs || {};
+  const branchUsed = cutoffs[branch] ? branch : cutoffs.CSE ? 'CSE' : Object.keys(cutoffs)[0];
+  const categoryCutoffs = cutoffs[branchUsed] || {};
+  const categoryUsed = categoryCutoffs[category] !== undefined
+    ? category
+    : categoryCutoffs.GEN !== undefined
+      ? 'GEN'
+      : Object.keys(categoryCutoffs)[0];
+
+  return {
+    value: categoryUsed ? categoryCutoffs[categoryUsed] : null,
+    branchUsed,
+    categoryUsed
+  };
+}
+
+function buildTieredResponse(colleges, student, data = null) {
   const pct = Number(student?.jeePercentile || 92);
   const cat = student?.category || 'OBC-NCL';
   const branch = student?.preferredBranch || 'CSE';
@@ -79,15 +83,12 @@ function buildTieredResponse(colleges, student) {
   const DREAM = [], REALISTIC = [], SAFE = [];
 
   colleges.forEach(c => {
-    const cutoff = c.cutoffs?.[branch]?.[cat]
-      || c.cutoffs?.[branch]?.['GEN']
-      || c.cutoffs?.['CSE']?.[cat]
-      || c.cutoffs?.['CSE']?.['GEN']
-      || 85;
+    const resolvedCutoff = resolveCutoff(c, branch, cat);
+    if (resolvedCutoff.value === null) return;
+    const cutoff = resolvedCutoff.value;
 
     const diff = pct - cutoff;
     const isHS = c.state === state;
-    const effectiveCutoff = isHS ? cutoff - 2 : cutoff; // Home state bonus
 
     const scholarship = getApplicableScholarship(student, c);
     const netCost = Math.max(0, c.annualTuition + c.annualHostel - scholarship);
@@ -100,16 +101,6 @@ function buildTieredResponse(colleges, student) {
       affordabilityTier: getAffordabilityTier(netCost, student.annualBudget)
     };
 
-    // Calculate estimated rank
-    const crlRank = Math.max(1, Math.round((100 - pct) * 14000));
-    let categoryRank = crlRank;
-    if (cat === 'OBC-NCL' || cat === 'OBC') categoryRank = Math.round(crlRank * 0.28);
-    else if (cat === 'EWS') categoryRank = Math.round(crlRank * 0.11);
-    else if (cat === 'SC') categoryRank = Math.round(crlRank * 0.15);
-    else if (cat === 'ST') categoryRank = Math.round(crlRank * 0.075);
-
-    const closingRank = Math.max(1, Math.round((100 - effectiveCutoff) * 14000));
-
     const enriched = {
       ...c,
       id: c.id,
@@ -117,35 +108,33 @@ function buildTieredResponse(colleges, student) {
       type: c.type,
       state: c.state,
       nirfRank: c.nirfRank,
-      branch: branch in (c.cutoffs || {}) ? branch : 'CSE',
-      effectiveCutoff,
-      cutoffPercentile: effectiveCutoff,
-      crlRank,
-      categoryRank,
-      closingRank,
+      branch: resolvedCutoff.branchUsed || branch,
+      requestedBranch: branch,
+      cutoffCategory: resolvedCutoff.categoryUsed || null,
+      cutoffBasis: resolvedCutoff.categoryUsed === cat
+        ? 'Seeded estimate for selected category'
+        : `Seeded estimate; ${resolvedCutoff.categoryUsed} fallback`,
+      effectiveCutoff: cutoff,
+      cutoffPercentile: cutoff,
       margin: Number(diff.toFixed(1)),
       isHomeState: isHS,
       isHomeStateEligible: isHS,
       counsellingBoard: c.counsellingBoard,
       affordability: aff,
-      dataSource: c.dataSource || 'Anakin Enriched'
+      dataSource: 'Seeded estimate; not verified by scraper',
+      sourceReferences: data?.collegeReferences?.[c.id] || [],
+      availableBranches: Object.keys(c.cutoffs || {}),
+      dataUpdatedAt: data?.enrichedAt || data?.scrapedAt || null
     };
 
-    // Accurate Tier Classification
-    // Safe: Score is comfortably above closing cutoff (+3.0%ile or more)
-    // Realistic: Score is close to cutoff (-2.0%ile to +3.0%ile)
-    // Dream: Score is below cutoff (aspirational reach)
     if (diff >= 3.0) {
       enriched.tier = 'SAFE';
-      enriched.admissionProbability = 'High (>85%)';
       SAFE.push(enriched);
     } else if (diff >= -2.0) {
       enriched.tier = 'REALISTIC';
-      enriched.admissionProbability = 'Competitive (50% - 80%)';
       REALISTIC.push(enriched);
     } else {
       enriched.tier = 'DREAM';
-      enriched.admissionProbability = 'Aspirational (20% - 40%)';
       DREAM.push(enriched);
     }
   });
@@ -153,9 +142,13 @@ function buildTieredResponse(colleges, student) {
   return {
     tiers: { DREAM, REALISTIC, SAFE },
     student,
-    crlRank: Math.max(1, Math.round((100 - pct) * 14000)),
     generatedAt: new Date().toISOString(),
-    dataSource: 'Anakin Web Scraper'
+    dataSource: 'Seeded estimates with scraped source references',
+    dataQuality: {
+      valuesVerifiedByScraper: false,
+      scrapedAt: data?.enrichedAt || data?.scrapedAt || null,
+      note: data?.dataQualityNote || 'Scraped links are references only and do not verify seeded values.'
+    }
   };
 }
 
@@ -467,8 +460,8 @@ function getBaseColleges() {
 // ─── Scholarship Data ─────────────────────────────────────────────────────────
 
 function buildScholarshipsFromScraped(data, student) {
-  const enrichedText = data?.scholarships?.summary || '';
   const s = student || defaultStudent();
+  const schemeDataSource = 'Seeded estimate; check current official scheme rules';
 
   const scholarships = [
     {
@@ -481,7 +474,7 @@ function buildScholarshipsFromScraped(data, student) {
       eligibleCategories: ['OBC-NCL', 'OBC'],
       incomeLimit: 100000,
       requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
-      dataSource: enrichedText.includes('OBC') ? 'Anakin Scraped' : 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-02',
@@ -493,7 +486,7 @@ function buildScholarshipsFromScraped(data, student) {
       eligibleCategories: ['SC'],
       incomeLimit: 250000,
       requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
-      dataSource: enrichedText.includes('SC') ? 'Anakin Scraped' : 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-03',
@@ -505,7 +498,7 @@ function buildScholarshipsFromScraped(data, student) {
       eligibleCategories: ['ST'],
       incomeLimit: 250000,
       requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
-      dataSource: enrichedText.includes('ST') ? 'Anakin Scraped' : 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-04',
@@ -518,7 +511,7 @@ function buildScholarshipsFromScraped(data, student) {
       incomeLimit: 250000,
       stateRestriction: 'Jharkhand',
       requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Domicile / Residence Certificate', 'Bank Passbook (First Page)'],
-      dataSource: enrichedText.includes('e-Kalyan') ? 'Anakin Scraped' : 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-05',
@@ -530,7 +523,7 @@ function buildScholarshipsFromScraped(data, student) {
       eligibleCategories: ['GEN', 'OBC-NCL', 'EWS'],
       incomeLimit: 450000,
       requiredDocuments: ['Income Certificate', 'Class 12 Marksheet', 'Bank Passbook (First Page)', 'Aadhaar Card'],
-      dataSource: 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-06',
@@ -542,7 +535,7 @@ function buildScholarshipsFromScraped(data, student) {
       eligibleCategories: ['OBC-NCL', 'EWS'],
       incomeLimit: 250000,
       requiredDocuments: ['Income Certificate', 'Caste / Category Certificate', 'Aadhaar Card'],
-      dataSource: enrichedText.includes('YASASVI') ? 'Anakin Scraped' : 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-07',
@@ -555,7 +548,7 @@ function buildScholarshipsFromScraped(data, student) {
       incomeLimit: 450000,
       stateRestriction: 'Assam',
       requiredDocuments: ['Income Certificate', 'Domicile / Residence Certificate', 'Class 12 Marksheet', 'Bank Passbook (First Page)', 'Aadhaar Card'],
-      dataSource: 'Base Data'
+      dataSource: schemeDataSource
     },
     {
       id: 'SCH-08',
@@ -568,7 +561,7 @@ function buildScholarshipsFromScraped(data, student) {
       incomeLimit: 500000,
       stateRestriction: 'Assam',
       requiredDocuments: ['Income Certificate', 'Domicile / Residence Certificate', 'Bank Passbook (First Page)', 'Aadhaar Card'],
-      dataSource: 'Base Data'
+      dataSource: schemeDataSource
     }
   ];
 
@@ -677,11 +670,11 @@ app.get('/api/alternatives', (req, res) => {
   const pathways = [
     {
       planTag: 'Plan A — Primary',
-      collegeName: 'NIT Jamshedpur (Home State Quota)',
+      collegeName: 'NIT Jamshedpur (check home-state eligibility)',
       branch: 'Computer Science Engineering',
       cutoff: 92.5,
       annualCost: Math.max(0, 142500 + 52000 - getApplicableScholarship(s, { id: 'COL-01' })),
-      reason: `Home state quota gives you a 2 percentile advantage at NIT Jamshedpur. With your ${pct}%ile, this is achievable during CSAB Special Rounds.`
+      reason: `Compare your ${pct}%ile with official round-wise closing ranks for your category, seat type, and applicable home-state quota. The displayed cutoff is a seeded estimate, not an official rank.`
     },
     {
       planTag: 'Plan B — Alternative Branch',
@@ -689,15 +682,15 @@ app.get('/api/alternatives', (req, res) => {
       branch: 'Electronics & Communication Engineering',
       cutoff: 90.2,
       annualCost: Math.max(0, 142500 + 52000 - getApplicableScholarship(s, {})),
-      reason: 'ECE at NIT JSR has a lower cutoff with the same infrastructure. Strong placement record in IT/Software sector.'
+      reason: 'Compare the ECE option against current official round-wise cutoff and placement information before ranking it.'
     },
     {
-      planTag: 'Plan C — Affordable Safety',
+      planTag: 'Plan C — Lower Cost Option',
       collegeName: 'BIT Sindri (Jharkhand State)',
       branch: 'Information Technology',
       cutoff: 85.0,
       annualCost: Math.max(0, 28000 + 18000 - getApplicableScholarship(s, {})),
-      reason: `Extremely affordable at ₹${(28000 + 18000).toLocaleString('en-IN')}/yr. Well within your budget with e-Kalyan scholarship relief.`
+      reason: `The seeded tuition and hostel estimate totals ₹${(28000 + 18000).toLocaleString('en-IN')}/yr before any confirmed aid. Verify current fees and scholarship eligibility with the official sources.`
     },
     {
       planTag: 'Plan D — Lateral Entry (Diploma)',
@@ -710,9 +703,9 @@ app.get('/api/alternatives', (req, res) => {
   ];
 
   res.json({
-    diagnosticMessage: `Based on ${pct}%ile (${cat}), ${pathways.length} strategic pathways identified. Plan A carries highest ROI for your profile.`,
+    diagnosticMessage: `Based on seeded estimates for ${pct}%ile (${cat}), ${pathways.length} pathways are listed for comparison. Confirm current eligibility, cutoffs, and costs with official sources.`,
     pathways,
-    dataSource: 'Anakin-Enriched Analysis'
+    dataSource: 'Seeded estimate; not verified by scraper'
   });
 });
 

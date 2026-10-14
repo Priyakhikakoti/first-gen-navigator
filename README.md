@@ -19,8 +19,8 @@ First Gen Navigator bridges information asymmetry by converting scattered counse
 - Segregates options into three actionable tiers:
   - **Realistic Target**: Colleges where the student has a competitive rank margin.
   - **Dream Reach**: Aspirational institutions where late-round or CSAB special round vacancies may be targeted.
-  - **Safe Backup**: High-probability backup institutions well above closing thresholds.
-- Incorporates state domicile quota relaxations and Tuition Fee Waiver (TFW) seat matrices.
+  - **Safe Backup**: Heuristic matches above the local cutoff estimate; not guaranteed admission.
+- Shows domicile-match context; confirm quota eligibility and Tuition Fee Waiver (TFW) rules with each counselling authority.
 
 ### 2. Transparent Scholarship Eligibility Engine
 - Replaces binary "eligible/ineligible" flags with line-by-line criterion audits.
@@ -28,7 +28,7 @@ First Gen Navigator bridges information asymmetry by converting scattered counse
 - Tracks required certificates (Income, Domicile, Caste, Marksheets) and computes real-time readiness scores.
 
 ### 3. Smart Net Affordability Calculator
-- Computes real out-of-pocket expenses before admission:
+- Estimates out-of-pocket expenses before admission:
   $$\text{Net Annual Cost} = \text{Annual Tuition} + \text{Annual Hostel \& Mess} - \text{Applicable Scholarships}$$
 - Compares net expenses against the family's maximum stated education budget with real-time feasibility gauges (*Affordable*, *Stretch*, *Not Affordable*).
 
@@ -67,6 +67,9 @@ First Gen Navigator bridges information asymmetry by converting scattered counse
 
 ## Technology Stack
 
+- **Scraper and API proxy**: Node.js, Express, and the Anakin SDK
+  - Scrape references with `npm run scrape` and serve the web app with `npm run dev`
+  - Add `ANAKIN_API_KEY` to the ignored root `.env` file before running the scraper
 - **Backend**: Pure Java (JDK 17 / 21 / 26 compatible)
   - Built-in multi-threaded HTTP server (`com.sun.net.httpserver.HttpServer`)
   - Zero external third-party library dependencies required for build or runtime
@@ -87,6 +90,24 @@ First Gen Navigator bridges information asymmetry by converting scattered counse
   - `GET /api/translate`
   - `GET /api/why-match`
   - `GET /api/health`
+
+---
+
+## Scraped Data Quality
+
+College cards include match and affordability context, available branch information, scrape timestamps, and any college-specific source links found by the scraper. Source links are discovery references only; they do not prove that a fee, ranking, or cutoff value came from that page.
+
+College fees, NIRF ranks, scholarship rules, and cutoff values currently come from the project's local seeded dataset. The percentile comparisons and Dream / Realistic / Safe groups are heuristic estimates—not official JoSAA closing ranks, admission probabilities, or guarantees. Home-state status is shown as context but is not applied as an arbitrary percentile adjustment. Verify current fees and counselling data with the official institution and counselling authorities before making decisions.
+
+The scraper preserves search results and source metadata for inspection, but does not yet extract and validate structured facts such as year-specific fees, placements, or round-wise category cutoffs. Do not treat scraper results as verified college data until those values are extracted with citations and reviewed.
+
+---
+
+## Authentication
+
+The web app uses the existing Supabase email/password authentication client. The application shell stays hidden until Supabase restores a valid session or a user signs in; signing out returns to the sign-in screen. If email confirmation is enabled in Supabase, a new user must confirm their address before signing in.
+
+Configure the deployed site URL and allowed redirect URLs in Supabase Auth settings. For private student data, enable Row Level Security on `student_profiles`, `student_documents`, and `admission_progress`, with policies that restrict each row to its owner (`auth.uid() = user_id`). The sign-in gate is a browser UI control; it does not secure unauthenticated API routes on its own.
 
 ---
 
