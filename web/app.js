@@ -2652,7 +2652,11 @@ async function startPaidAnalysis(onPaid, analysisId = createAnalysisId()) {
       image.src = qrUrl.href;
     }
     if (checkButton) checkButton.disabled = false;
-    setPaymentGateStatus('Scan the QR with a UPI app and pay exactly ₹50. This QR is single-use and expires after 30 minutes.');
+    if (result.mode === 'test') {
+      setPaymentGateStatus('TEST MODE: This QR is for testing and cannot collect a real UPI payment. To pay ₹50, configure matching Razorpay live-mode keys in .env and restart the server.');
+    } else {
+      setPaymentGateStatus('Scan the QR with a supported UPI app and pay exactly ₹50. This QR is single-use and expires after 30 minutes.');
+    }
     paymentPollTimer = window.setInterval(() => checkAnalysisPayment(false), 5000);
   } catch (requestError) {
     console.error('Unable to start paid analysis:', requestError);

@@ -16,6 +16,8 @@ import express from 'express';
 import cors from 'cors';
 import { Anakin } from '@anakin-io/sdk';
 import crypto from 'crypto';
+import dns from 'node:dns/promises';
+import https from 'node:https';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -37,6 +39,51 @@ app.use(express.json({ limit: '32kb' }));
 
 // ─── Serve static web files ──────────────────────────────────────────────────
 app.use(express.static(path.join(ROOT, 'web')));
+
+async function httpsJsonRequest(url, options = {}) {
+  const hostname = new URL(url).hostname;
+  let addresses;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      addresses = await dns.lookup(hostname, { all: true });
+      break;
+    } catch (error) {
+      if (!['ENOTFOUND', 'EAI_AGAIN'].includes(error.code) || attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(url, {
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      agent: false,
+      lookup: (_hostname, lookupOptions, callback) => {
+        if (lookupOptions.all) return callback(null, addresses);
+        const address = addresses.find(item => !lookupOptions.family || item.family === lookupOptions.family);
+        if (!address) return callback(new Error('No compatible network address was found for the payment provider.'));
+        return callback(null, address.address, address.family);
+      }
+    }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status: response.statusCode,
+          text: async () => body,
+          json: async () => JSON.parse(body)
+        });
+      });
+    });
+    request.setTimeout(15000, () => {
+      request.destroy(new Error('The payment provider request timed out. Please try again.'));
+    });
+    request.on('error', reject);
+    request.end(options.body);
+  });
+}
 
 // ─── Data Helpers ────────────────────────────────────────────────────────────
 
@@ -626,13 +673,17 @@ function getPaymentConfig() {
   return config;
 }
 
+function getRazorpayMode(config = getPaymentConfig()) {
+  return config.razorpayKeyId.startsWith('rzp_test_') ? 'test' : 'live';
+}
+
 async function getSupabaseUser(req) {
   const authorization = req.get('authorization') || '';
   const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!token) return null;
 
   const config = getPaymentConfig();
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
+  const response = await httpsJsonRequest(`${config.supabaseUrl}/auth/v1/user`, {
     headers: {
       apikey: config.supabaseAnonKey,
       Authorization: `Bearer ${token}`
@@ -644,7 +695,7 @@ async function getSupabaseUser(req) {
 
 async function supabasePaymentRequest(pathname, options = {}) {
   const config = getPaymentConfig();
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/${pathname}`, {
+  const response = await httpsJsonRequest(`${config.supabaseUrl}/rest/v1/${pathname}`, {
     ...options,
     headers: {
       apikey: config.supabaseServiceRoleKey,
@@ -677,7 +728,7 @@ async function getAnalysisPayment(userId, analysisId) {
 async function razorpayRequest(pathname, options = {}) {
   const config = getPaymentConfig();
   const authorization = Buffer.from(`${config.razorpayKeyId}:${config.razorpayKeySecret}`).toString('base64');
-  const response = await fetch(`https://api.razorpay.com/v1${pathname}`, {
+  const response = await httpsJsonRequest(`https://api.razorpay.com/v1${pathname}`, {
     ...options,
     headers: {
       Authorization: `Basic ${authorization}`,
@@ -723,6 +774,7 @@ app.post('/api/payments/qr', requireSupabaseUser, async (req, res) => {
         Date.parse(existing.expires_at) > Date.now()) {
       return res.json({
         status: 'pending',
+        mode: getRazorpayMode(),
         analysisId,
         qrCodeId: existing.razorpay_qr_code_id,
         imageUrl: existing.qr_image_url,
@@ -769,6 +821,7 @@ app.post('/api/payments/qr', requireSupabaseUser, async (req, res) => {
     if (!rows?.length) throw new Error('Payment record was not saved.');
     return res.status(existing ? 200 : 201).json({
       status: rows[0].status,
+      mode: getRazorpayMode(),
       analysisId,
       qrCodeId: qr.id,
       imageUrl: qr.image_url,
