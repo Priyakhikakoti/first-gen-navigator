@@ -4,7 +4,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Render-00c7b7?style=for-the-badge&logo=render&logoColor=white)](https://first-gen-navigator.onrender.com)
 [![Deployment Status](https://img.shields.io/badge/Status-Live-success?style=for-the-badge)](https://first-gen-navigator.onrender.com)
-[![Java](https://img.shields.io/badge/Java-JDK_21%2B-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
+[![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 
 🌐 **Live Deployed Web Application**: **[https://first-gen-navigator.onrender.com](https://first-gen-navigator.onrender.com)**
 
@@ -70,10 +70,9 @@ First Gen Navigator bridges information asymmetry by converting scattered counse
 - **Scraper and API proxy**: Node.js, Express, and the Anakin SDK
   - Scrape references with `npm run scrape` and serve the web app with `npm run dev`
   - Add `ANAKIN_API_KEY` to the ignored root `.env` file before running the scraper
-- **Backend**: Pure Java (JDK 17 / 21 / 26 compatible)
-  - Built-in multi-threaded HTTP server (`com.sun.net.httpserver.HttpServer`)
-  - Zero external third-party library dependencies required for build or runtime
-  - Clean OOP architecture: Models, Services, In-Memory DataStore, REST Handlers, and Unit Verification Tests
+- **API and production server**: Node.js 22+, Express, Supabase Auth, and Razorpay
+  - `scraper/proxy-server.js` serves the web app and enforces payment before analysis API access
+  - The Java implementation under `src/` remains an optional standalone backend; deployment uses the Node server
 - **Frontend**: Clean Institutional Web Architecture
   - Semantic HTML5 & Vanilla CSS3
   - Custom institutional academic design system (Deep Navy `#0b132b`, Slate `#f8fafc`, Emerald `#059669`, Saffron `#d97706`)
@@ -89,6 +88,7 @@ First Gen Navigator bridges information asymmetry by converting scattered counse
   - `GET /api/roadmap`
   - `GET /api/translate`
   - `GET /api/why-match`
+  - `POST /api/payments/qr`, `GET /api/payments/qr/:qrCodeId`
   - `GET /api/health`
 
 ---
@@ -108,6 +108,21 @@ The scraper preserves search results and source metadata for inspection, but doe
 The web app uses the existing Supabase email/password authentication client. The application shell stays hidden until Supabase restores a valid session or a user signs in; signing out returns to the sign-in screen. If email confirmation is enabled in Supabase, a new user must confirm their address before signing in.
 
 Configure the deployed site URL and allowed redirect URLs in Supabase Auth settings. For private student data, enable Row Level Security on `student_profiles`, `student_documents`, and `admission_progress`, with policies that restrict each row to its owner (`auth.uid() = user_id`). The sign-in gate is a browser UI control; it does not secure unauthenticated API routes on its own.
+
+## Paid Analysis Checkout
+
+Each initial analysis, profile update/recalculation, and manual refresh requires a new ₹50 Razorpay UPI QR payment. The Node API verifies the signed-in Supabase user and confirms the exact ₹50 INR captured payment with Razorpay before granting analysis API access. Razorpay credentials and the Supabase service-role key are server-only.
+
+1. Run `supabase/schema.sql` in the Supabase SQL Editor. This creates/migrates the `analysis_payments` ledger with owner-only read access; the server writes it using the service-role key. The migration expires old manual-review requests so they cannot grant paid access without a Razorpay-confirmed payment.
+2. Configure the following environment variables for local development and production:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` — keep private; never add it to browser code or commit it
+   - `RAZORPAY_KEY_ID`
+   - `RAZORPAY_KEY_SECRET` — keep private; never add it to browser code or commit it
+3. Configure these values in the Render service environment. Start with Razorpay test keys, then use live keys only after testing QR creation, payment capture, cancellation/expiry, and verification.
+
+Do not use the static Google Pay QR for this flow. Razorpay creates a unique, fixed-amount QR per analysis, then the server verifies captured payments directly with Razorpay.
 
 ---
 
@@ -160,56 +175,19 @@ first-gen-navigator/
 ## Getting Started
 
 ### Prerequisites
-- **Java Development Kit (JDK 17 or higher)** installed and available in your `PATH`.
-- Check your installation:
-  ```bash
-  javac -version
-  java -version
-  ```
+- Node.js 22 or higher and npm.
+- Supabase server environment variables configured as described above.
 
-### 1. Compile the Java Source Code
-```powershell
-# Windows (PowerShell)
-$files = (Get-ChildItem -Recurse -Filter *.java src).FullName; javac -d bin $files
-
-# macOS / Linux (Bash)
-find src -name "*.java" > sources.txt && javac -d bin @sources.txt
-```
-
-### 2. Run Automated Verification Tests
-Run the standalone integration test suite to verify all business rules:
+### Start the Node server
 ```bash
-java -cp bin com.firstgen.navigator.test.SystemVerificationTest
+npm ci
+npm run dev
 ```
-Expected output:
-```
-=========================================================
-  RUNNING SYSTEM VERIFICATION TESTS: FIRST GEN NAVIGATOR
-=========================================================
-  [PASS] Tuition Calculation
-  [PASS] Hostel Calculation
-  ...
-=========================================================
-  TEST RESULTS: 22 PASSED, 0 FAILED
-=========================================================
-```
-
-### 3. Launch the Web Server
-```bash
-java -cp bin com.firstgen.navigator.server.FirstGenNavigatorServer
-```
-Output:
-```
-=========================================================
-  FIRST GEN NAVIGATOR - Higher Education Guidance Server
-  Status: RUNNING at http://localhost:8080
-  Access Web Interface: http://localhost:8080
-=========================================================
-```
+Open `http://localhost:3001`. Configure the Supabase and Razorpay server environment variables before testing checkout.
 
 ### 4. Access the Platform
 - **Live Production URL**: **[https://first-gen-navigator.onrender.com](https://first-gen-navigator.onrender.com)**
-- **Local Development**: `http://localhost:8080`
+- **Local Development**: `http://localhost:3001`
 
 ---
 

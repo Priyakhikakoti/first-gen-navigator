@@ -19,6 +19,11 @@ async function signIn(email, password) {
 async function signOut() { return await _supabase.auth.signOut(); }
 async function getSession() { const { data } = await _supabase.auth.getSession(); return data?.session ?? null; }
 async function getUser() { const s = await getSession(); return s?.user ?? null; }
+async function getAccessToken() {
+  const { data, error } = await _supabase.auth.getSession();
+  if (error) throw error;
+  return data?.session?.access_token ?? null;
+}
 
 // ─── Profile DB ────────────────────────────────────────────────────────────────
 async function dbGetProfile(userId) {
@@ -65,7 +70,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // ─── Expose globally ───────────────────────────────────────────────────────────
-window.FGNAuth = { signUp, signIn, signOut, getSession, getUser, client: _supabase };
+window.FGNAuth = { signUp, signIn, signOut, getSession, getUser, getAccessToken, client: _supabase };
 window.FGNDB = { getProfile: dbGetProfile, upsertProfile: dbUpsertProfile, getDocuments: dbGetDocuments, upsertDocument: dbUpsertDocument, getProgress: dbGetProgress, updateProgress: dbUpdateProgress };
 
 console.log('[FGN] Supabase client ready.');

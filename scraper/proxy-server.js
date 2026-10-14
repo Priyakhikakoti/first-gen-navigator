@@ -15,6 +15,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { Anakin } from '@anakin-io/sdk';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -24,12 +25,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 
 const app = express();
-const PORT = process.env.SCRAPER_PORT || 3001;
+const PORT = process.env.PORT || process.env.SCRAPER_PORT || 3001;
+const ANALYSIS_PRICE_PAISE = 5000;
 
-const client = new Anakin({ apiKey: process.env.ANAKIN_API_KEY });
+const client = process.env.ANAKIN_API_KEY
+  ? new Anakin({ apiKey: process.env.ANAKIN_API_KEY })
+  : null;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 
 // ─── Serve static web files ──────────────────────────────────────────────────
 app.use(express.static(path.join(ROOT, 'web')));
@@ -596,10 +600,6 @@ function buildScholarshipsFromScraped(data, student) {
   });
 }
 
-// ─── In-memory student state ──────────────────────────────────────────────────
-
-let currentStudent = defaultStudent();
-
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
 // Health
@@ -607,27 +607,282 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'UP', system: 'First Gen Navigator (Anakin-Powered)', port: PORT });
 });
 
+function getPaymentConfig() {
+  const config = {
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+    razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET
+  };
+  const missing = Object.entries(config)
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (missing.length) {
+    const error = new Error(`Payment server configuration is missing: ${missing.join(', ')}`);
+    error.statusCode = 503;
+    throw error;
+  }
+  return config;
+}
+
+async function getSupabaseUser(req) {
+  const authorization = req.get('authorization') || '';
+  const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) return null;
+
+  const config = getPaymentConfig();
+  const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
+    headers: {
+      apikey: config.supabaseAnonKey,
+      Authorization: `Bearer ${token}`
+    }
+  });
+  if (!response.ok) return null;
+  return response.json();
+}
+
+async function supabasePaymentRequest(pathname, options = {}) {
+  const config = getPaymentConfig();
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${pathname}`, {
+    ...options,
+    headers: {
+      apikey: config.supabaseServiceRoleKey,
+      Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  const body = await response.text();
+  if (!response.ok) {
+    console.error('Supabase payment ledger request failed:', response.status);
+    const error = new Error('Payment records could not be saved. Please try again.');
+    error.statusCode = 502;
+    throw error;
+  }
+  return body ? JSON.parse(body) : null;
+}
+
+async function getAnalysisPayment(userId, analysisId) {
+  const query = new URLSearchParams({
+    select: 'id,user_id,analysis_id,razorpay_qr_code_id,qr_image_url,amount_paise,currency,status,razorpay_payment_id,paid_at,expires_at',
+    user_id: `eq.${userId}`,
+    analysis_id: `eq.${analysisId}`,
+    limit: '1'
+  });
+  const rows = await supabasePaymentRequest(`analysis_payments?${query}`);
+  return rows?.[0] || null;
+}
+
+async function razorpayRequest(pathname, options = {}) {
+  const config = getPaymentConfig();
+  const authorization = Buffer.from(`${config.razorpayKeyId}:${config.razorpayKeySecret}`).toString('base64');
+  const response = await fetch(`https://api.razorpay.com/v1${pathname}`, {
+    ...options,
+    headers: {
+      Authorization: `Basic ${authorization}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error('Razorpay request failed:', response.status, result?.error?.code || 'unknown error');
+    const error = new Error('Razorpay could not process this payment request. Please try again.');
+    error.statusCode = 502;
+    throw error;
+  }
+  return result;
+}
+
+async function requireSupabaseUser(req, res, next) {
+  try {
+    req.authUser = await getSupabaseUser(req);
+    if (!req.authUser?.id) return res.status(401).json({ error: 'Sign in is required.' });
+    return next();
+  } catch (error) {
+    console.error('Supabase authentication check failed:', error);
+    return res.status(error.statusCode || 503).json({ error: error.message || 'Could not verify your session.' });
+  }
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+app.post('/api/payments/qr', requireSupabaseUser, async (req, res) => {
+  try {
+    const { analysisId } = req.body || {};
+    if (typeof analysisId !== 'string' || !UUID_PATTERN.test(analysisId)) {
+      return res.status(400).json({ error: 'A valid analysis ID is required.' });
+    }
+    const existing = await getAnalysisPayment(req.authUser.id, analysisId);
+    if (existing?.status === 'paid') {
+      return res.json({ status: 'paid', analysisId });
+    }
+    if (existing?.status === 'pending' && existing.razorpay_qr_code_id &&
+        existing.qr_image_url && existing.expires_at &&
+        Date.parse(existing.expires_at) > Date.now()) {
+      return res.json({
+        status: 'pending',
+        analysisId,
+        qrCodeId: existing.razorpay_qr_code_id,
+        imageUrl: existing.qr_image_url,
+        amountPaise: existing.amount_paise
+      });
+    }
+
+    const closeBy = Math.floor(Date.now() / 1000) + (30 * 60);
+    const qr = await razorpayRequest('/payments/qr_codes', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'upi_qr',
+        name: 'FGN College Analysis',
+        usage: 'single_use',
+        fixed_amount: true,
+        payment_amount: ANALYSIS_PRICE_PAISE,
+        close_by: closeBy,
+        notes: { user_id: req.authUser.id, analysis_id: analysisId }
+      })
+    });
+    if (!qr.id || !qr.image_url || !/^https:\/\//i.test(qr.image_url)) {
+      console.error('Razorpay returned an incomplete QR response.');
+      return res.status(502).json({ error: 'Razorpay did not return a usable payment QR. Please try again.' });
+    }
+
+    const record = {
+      user_id: req.authUser.id,
+      analysis_id: analysisId,
+      razorpay_qr_code_id: qr.id,
+      qr_image_url: qr.image_url,
+      amount_paise: ANALYSIS_PRICE_PAISE,
+      currency: 'INR',
+      status: 'pending',
+      razorpay_payment_id: null,
+      paid_at: null,
+      expires_at: new Date(closeBy * 1000).toISOString()
+    };
+    const paymentQuery = new URLSearchParams({ on_conflict: 'user_id,analysis_id', select: 'status' });
+    const rows = await supabasePaymentRequest(`analysis_payments?${paymentQuery}`, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(record)
+    });
+    if (!rows?.length) throw new Error('Payment record was not saved.');
+    return res.status(existing ? 200 : 201).json({
+      status: rows[0].status,
+      analysisId,
+      qrCodeId: qr.id,
+      imageUrl: qr.image_url,
+      amountPaise: ANALYSIS_PRICE_PAISE
+    });
+  } catch (error) {
+    console.error('Unable to create analysis payment QR:', error);
+    return res.status(error.statusCode || 500).json({ error: error.message || 'Could not create a payment QR.' });
+  }
+});
+
+app.get('/api/payments/qr/:qrCodeId', requireSupabaseUser, async (req, res) => {
+  try {
+    const query = new URLSearchParams({
+      select: 'user_id,analysis_id,razorpay_qr_code_id,amount_paise,currency,status,razorpay_payment_id,paid_at,expires_at',
+      user_id: `eq.${req.authUser.id}`,
+      razorpay_qr_code_id: `eq.${req.params.qrCodeId}`,
+      limit: '1'
+    });
+    const rows = await supabasePaymentRequest(`analysis_payments?${query}`);
+    const payment = rows?.[0];
+    if (!payment) return res.status(404).json({ error: 'Payment QR not found for this account.' });
+    if (payment.status === 'paid') {
+      return res.json({ status: 'paid', analysisId: payment.analysis_id });
+    }
+
+    const qrPayments = await razorpayRequest(`/payments/qr_codes/${encodeURIComponent(req.params.qrCodeId)}/payments`);
+    const captured = (qrPayments.items || []).find(item =>
+      item.status === 'captured' &&
+      item.qr_code_id === req.params.qrCodeId &&
+      item.amount === ANALYSIS_PRICE_PAISE &&
+      item.currency === 'INR'
+    );
+    if (!captured?.id) {
+      if (payment.expires_at && Date.parse(payment.expires_at) <= Date.now()) {
+        return res.json({ status: 'expired', analysisId: payment.analysis_id });
+      }
+      return res.json({ status: 'pending', analysisId: payment.analysis_id });
+    }
+
+    const updateQuery = new URLSearchParams({
+      user_id: `eq.${req.authUser.id}`,
+      analysis_id: `eq.${payment.analysis_id}`,
+      status: 'eq.pending',
+      select: 'status'
+    });
+    const updates = await supabasePaymentRequest(`analysis_payments?${updateQuery}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status: 'paid',
+        razorpay_payment_id: captured.id,
+        paid_at: new Date().toISOString()
+      })
+    });
+    if (!updates?.length) {
+      const refreshed = await getAnalysisPayment(req.authUser.id, payment.analysis_id);
+      if (refreshed?.status !== 'paid' || refreshed.razorpay_payment_id !== captured.id) {
+        return res.status(409).json({ error: 'Payment was captured but its status could not be saved. Please contact support.' });
+      }
+    }
+    return res.json({ status: 'paid', analysisId: payment.analysis_id });
+  } catch (error) {
+    console.error('Unable to verify analysis payment:', error);
+    return res.status(error.statusCode || 500).json({ error: error.message || 'Could not verify the payment yet.' });
+  }
+});
+
+app.use('/api', async (req, res, next) => {
+  try {
+    const user = await getSupabaseUser(req);
+    if (!user?.id) return res.status(401).json({ error: 'Sign in is required.' });
+
+    const analysisId = req.get('x-fgn-analysis-id');
+    if (!analysisId || !UUID_PATTERN.test(analysisId)) {
+      return res.status(402).json({ error: 'A paid analysis is required.', code: 'PAYMENT_REQUIRED' });
+    }
+
+    const payment = await getAnalysisPayment(user.id, analysisId);
+    if (!payment || payment.status !== 'paid' || payment.amount_paise !== ANALYSIS_PRICE_PAISE || payment.currency !== 'INR') {
+      return res.status(402).json({ error: 'Pay ₹50 to continue with this analysis.', code: 'PAYMENT_REQUIRED' });
+    }
+
+    req.authUser = user;
+    req.student = studentsByUser.get(user.id) || defaultStudent();
+    return next();
+  } catch (error) {
+    console.error('Could not authorize analysis API request:', error);
+    return res.status(error.statusCode || 503).json({ error: error.message || 'Could not verify paid access.' });
+  }
+});
+
 // Profile
 app.get('/api/profile', (req, res) => {
-  res.json(currentStudent);
+  res.json(req.student);
 });
 
 app.post('/api/profile', (req, res) => {
-  currentStudent = { ...currentStudent, ...req.body };
-  res.json(currentStudent);
+  const student = { ...req.student, ...req.body };
+  studentsByUser.set(req.authUser.id, student);
+  res.json(student);
 });
 
 // Colleges (real data from Anakin scrape)
 app.get('/api/colleges', (req, res) => {
   const data = loadEnrichedData();
-  const result = buildCollegesFromScraped(data, currentStudent);
+  const result = buildCollegesFromScraped(data, req.student);
   res.json(result);
 });
 
 // Scholarships (real data from Anakin scrape)
 app.get('/api/scholarships', (req, res) => {
   const data = loadEnrichedData();
-  const result = buildScholarshipsFromScraped(data, currentStudent);
+  const result = buildScholarshipsFromScraped(data, req.student);
   res.json(result);
 });
 
@@ -640,11 +895,11 @@ app.get('/api/affordability', (req, res) => {
   if (!college) return res.status(404).json({ error: 'College not found' });
 
   const customSch = Number(customScholarship || 0);
-  const autoSch = getApplicableScholarship(currentStudent, college);
+  const autoSch = getApplicableScholarship(req.student, college);
   const applicableScholarship = Math.max(customSch, autoSch);
 
   const netCost = Math.max(0, college.annualTuition + college.annualHostel - applicableScholarship);
-  const budget = Number(currentStudent.annualBudget || 1);
+  const budget = Number(req.student.annualBudget || 1);
   const tier = getAffordabilityTier(netCost, budget);
 
   res.json({
@@ -661,7 +916,7 @@ app.get('/api/affordability', (req, res) => {
 
 // Alternatives / Pathways
 app.get('/api/alternatives', (req, res) => {
-  const s = currentStudent;
+  const s = req.student;
   const pct = Number(s.jeePercentile || 75);
   const cat = s.category || 'GEN';
   const branch = s.preferredBranch || 'CSE';
@@ -711,7 +966,7 @@ app.get('/api/alternatives', (req, res) => {
 
 // ─── In-memory document vault (persists for session) ─────────────────────────
 
-const documentVault = [
+const defaultDocumentVault = [
   { id: 'DOC-01', documentType: 'Income Certificate',              fileName: null,                        status: 'Pending',  issuer: 'Tehsildar / SDM Office',         notes: 'Required for all income-based scholarships and EWS/OBC-NCL quota.',    critical: true  },
   { id: 'DOC-02', documentType: 'Caste / Category Certificate',    fileName: null,                        status: 'Pending',  issuer: 'District Magistrate Office',      notes: 'Mandatory for OBC-NCL / SC / ST / EWS quota seat allocation.',        critical: true  },
   { id: 'DOC-03', documentType: 'Class 10 Marksheet & Certificate',fileName: 'class10_marksheet.pdf',    status: 'Uploaded', issuer: 'School / CBSE / State Board',     notes: 'Board certificate and marksheet with roll number.', critical: true  },
@@ -721,7 +976,18 @@ const documentVault = [
   { id: 'DOC-07', documentType: 'Bank Passbook (First Page)',       fileName: null,                        status: 'Pending',  issuer: 'Nationalized Bank',              notes: 'For scholarship disbursement — first page with IFSC and account no.', critical: false }
 ];
 
-function buildDocumentsResponse() {
+const documentsByUser = new Map();
+const studentsByUser = new Map();
+
+function getDocumentVault(userId) {
+  if (!documentsByUser.has(userId)) {
+    documentsByUser.set(userId, defaultDocumentVault.map(document => ({ ...document })));
+  }
+  return documentsByUser.get(userId);
+}
+
+function buildDocumentsResponse(userId) {
+  const documentVault = getDocumentVault(userId);
   const uploaded = documentVault.filter(d => d.status === 'Uploaded').length;
   const total    = documentVault.length;
   const missing  = total - uploaded;
@@ -736,7 +1002,7 @@ function buildDocumentsResponse() {
 
 // GET /api/documents
 app.get('/api/documents', (req, res) => {
-  res.json(buildDocumentsResponse());
+  res.json(buildDocumentsResponse(req.authUser.id));
 });
 
 // POST /api/documents — called by confirmDocumentUpload() in app.js
@@ -748,6 +1014,7 @@ app.post('/api/documents', (req, res) => {
   }
 
   // Find existing doc by type (case-insensitive) or create a new one
+  const documentVault = getDocumentVault(req.authUser.id);
   const existing = documentVault.find(
     d => d.documentType.toLowerCase() === documentType.toLowerCase()
   );
@@ -768,7 +1035,7 @@ app.post('/api/documents', (req, res) => {
     });
   }
 
-  res.json(buildDocumentsResponse());
+  res.json(buildDocumentsResponse(req.authUser.id));
 });
 
 
@@ -863,7 +1130,7 @@ app.get('/api/why-match', async (req, res) => {
 
   if (!college) return res.status(404).json({ error: 'College not found' });
 
-  const s = currentStudent;
+  const s = req.student;
   const cat = s.category || 'GEN';
   const branch = s.preferredBranch || 'CSE';
   const pct = Number(s.jeePercentile || 85);

@@ -767,6 +767,39 @@
     </section>
   </main>
 
+  <main class="analysis-payment-gate" id="analysisPaymentGate" hidden>
+    <section class="analysis-payment-card" aria-labelledby="paymentGateTitle">
+      <a class="auth-gate-brand payment-gate-brand" href="#" aria-label="First Gen Navigator home">
+        <span class="brand-symbol">FGN</span>
+        <span class="brand-text">
+          <span class="brand-title">FIRST GEN NAVIGATOR</span>
+          <span class="brand-sub">Your path to college, simplified.</span>
+        </span>
+      </a>
+      <div class="payment-gate-copy">
+        <span class="auth-gate-eyebrow">Secure checkout</span>
+        <h1 id="paymentGateTitle">Unlock your college analysis</h1>
+        <p>Pay once to generate your personalized college matches, scholarship checks, and affordability analysis.</p>
+      </div>
+      <div class="payment-amount"><span>Analysis fee</span><strong>₹50</strong></div>
+      <div class="payment-qr-panel">
+        <div class="payment-qr-placeholder" id="paymentQrPlaceholder" aria-live="polite">
+          <span class="payment-spinner" aria-hidden="true"></span>
+          <span id="paymentQrStatus">Preparing your secure UPI QR...</span>
+        </div>
+        <img class="payment-qr-image" id="paymentQrImage" alt="Single-use Razorpay UPI QR for ₹50 analysis payment" hidden />
+      </div>
+      <p class="payment-gate-status" id="paymentGateStatus" role="status" aria-live="polite">Your analysis starts only after Razorpay confirms payment.</p>
+      <div class="payment-gate-error" id="paymentGateError" role="alert"></div>
+      <div class="payment-gate-actions">
+        <button class="btn-primary auth-submit-btn" type="button" id="btnCheckPayment" disabled>I've paid — check payment</button>
+        <button class="payment-retry-btn" type="button" id="btnRetryPayment" hidden>Generate payment QR</button>
+        <button class="payment-signout-btn" type="button" id="btnPaymentSignOut">Sign out</button>
+      </div>
+      <p class="auth-gate-privacy">Payment is verified securely with Razorpay. Never share your UPI PIN or payment OTP.</p>
+    </section>
+  </main>
+
   <script src="supabase-client.js"></script>
   <script src="app.js"></script>
 </body>

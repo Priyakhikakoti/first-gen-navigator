@@ -87,3 +87,78 @@ CREATE POLICY "Users can insert own progress"
 CREATE POLICY "Users can update own progress"
   ON public.admission_progress FOR UPDATE
   USING (auth.uid() = user_id);
+
+-- ── 4. Paid Analysis Ledger ───────────────────────────────────────────────────
+-- The Express server alone writes payment state with the service-role key.
+CREATE TABLE IF NOT EXISTS public.analysis_payments (
+  id                    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id               UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  analysis_id           UUID NOT NULL,
+  razorpay_qr_code_id   TEXT,
+  qr_image_url          TEXT,
+  amount_paise          INTEGER NOT NULL CHECK (amount_paise = 5000),
+  currency              TEXT NOT NULL CHECK (currency = 'INR'),
+  status                TEXT NOT NULL DEFAULT 'pending',
+  razorpay_payment_id   TEXT,
+  paid_at               TIMESTAMPTZ,
+  expires_at            TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, analysis_id)
+);
+
+-- Remove manual-review fields from deployments that ran the interim QR flow.
+ALTER TABLE public.analysis_payments
+  DROP COLUMN IF EXISTS payment_reference CASCADE,
+  DROP COLUMN IF EXISTS reviewed_by CASCADE,
+  DROP COLUMN IF EXISTS reviewed_at CASCADE,
+  DROP COLUMN IF EXISTS review_note CASCADE;
+
+ALTER TABLE public.analysis_payments
+  ADD COLUMN IF NOT EXISTS razorpay_qr_code_id TEXT,
+  ADD COLUMN IF NOT EXISTS qr_image_url TEXT,
+  ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT,
+  ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+
+ALTER TABLE public.analysis_payments
+  DROP CONSTRAINT IF EXISTS analysis_payments_status_check,
+  DROP CONSTRAINT IF EXISTS analysis_payments_check,
+  DROP CONSTRAINT IF EXISTS analysis_payments_check1,
+  DROP CONSTRAINT IF EXISTS analysis_payments_qr_fields_check;
+
+-- Old manual reviews have no Razorpay identifiers and cannot authorize access.
+UPDATE public.analysis_payments
+SET status = 'expired',
+    razorpay_qr_code_id = NULL,
+    qr_image_url = NULL,
+    razorpay_payment_id = NULL,
+    paid_at = NULL,
+    expires_at = NULL
+WHERE status NOT IN ('pending', 'paid', 'expired')
+   OR razorpay_qr_code_id IS NULL
+   OR qr_image_url IS NULL
+   OR expires_at IS NULL;
+
+ALTER TABLE public.analysis_payments
+  ADD CONSTRAINT analysis_payments_status_check CHECK (status IN ('pending', 'paid', 'expired')),
+  ADD CONSTRAINT analysis_payments_qr_fields_check CHECK (status = 'expired' OR (
+    razorpay_qr_code_id IS NOT NULL AND
+    qr_image_url IS NOT NULL AND
+    expires_at IS NOT NULL
+  ));
+
+CREATE UNIQUE INDEX IF NOT EXISTS analysis_payments_qr_code_id_key
+  ON public.analysis_payments (razorpay_qr_code_id)
+  WHERE razorpay_qr_code_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS analysis_payments_razorpay_payment_id_key
+  ON public.analysis_payments (razorpay_payment_id)
+  WHERE razorpay_payment_id IS NOT NULL;
+
+ALTER TABLE public.analysis_payments ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.analysis_payments FROM anon, authenticated;
+GRANT SELECT ON TABLE public.analysis_payments TO authenticated;
+GRANT ALL ON TABLE public.analysis_payments TO service_role;
+
+DROP POLICY IF EXISTS "Users can view own analysis payments" ON public.analysis_payments;
+CREATE POLICY "Users can view own analysis payments"
+  ON public.analysis_payments FOR SELECT
+  USING (auth.uid() = user_id);
