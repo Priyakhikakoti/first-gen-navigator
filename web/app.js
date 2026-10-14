@@ -339,7 +339,6 @@ function classifyCertificateText(extractedText, originalFileName, targetType) {
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupAuthListeners();
-  setupFlowScrollListener();
 
   document.addEventListener('fgn:authchange', event => {
     const user = event.detail?.session?.user || null;
@@ -2356,36 +2355,6 @@ function setPreset(name, pct, cat, st, inc, br, bud, btnId) {
   if (budEl) budEl.value = bud;
 
   saveProfile();
-}
-
-// ─── Flow Navigation Scroll Synchronization ───────────────────────────────────
-function setupFlowScrollListener() {
-  const sections = [
-    { id: 'profile-section', step: 'profile' },
-    { id: 'colleges-section', step: 'colleges' },
-    { id: 'calculator-section', step: 'affordability' },
-    { id: 'documents-section', step: 'documents' },
-    { id: 'readiness-section', step: 'readiness' },
-    { id: 'deadlines-section', step: 'deadlines' },
-    { id: 'next-actions-section', step: 'what-next' }
-  ];
-
-  window.addEventListener('scroll', () => {
-    const scrollPos = window.scrollY + 200;
-    for (let i = sections.length - 1; i >= 0; i--) {
-      const el = document.getElementById(sections[i].id);
-      if (el && el.offsetTop <= scrollPos) {
-        document.querySelectorAll('.flow-step-item').forEach(item => {
-          if (item.dataset.step === sections[i].step) {
-            item.classList.add('active');
-          } else {
-            item.classList.remove('active');
-          }
-        });
-        break;
-      }
-    }
-  });
 }
 
 // ─── Data Master Loader ───────────────────────────────────────────────────────
