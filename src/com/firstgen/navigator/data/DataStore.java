@@ -20,6 +20,7 @@ public class DataStore {
 
     private DataStore() {
         seedColleges();
+        loadDynamicCollegesIfAvailable();
         seedScholarships();
         seedDeadlines();
         seedDefaultStudent();
@@ -528,4 +529,78 @@ public class DataStore {
     public Map<String, List<ApplicationRecord>> getStudentApplications() { return studentApplications; }
     public Student getCurrentStudent() { return currentStudent; }
     public void setCurrentStudent(Student currentStudent) { this.currentStudent = currentStudent; }
+
+    public void loadDynamicCollegesIfAvailable() {
+        try {
+            java.io.File file = new java.io.File("scraper/dynamic-colleges.json");
+            if (!file.exists()) {
+                file = new java.io.File("../scraper/dynamic-colleges.json");
+            }
+            if (!file.exists()) return;
+
+            String json = new String(java.nio.file.Files.readAllBytes(file.toPath()), "UTF-8").trim();
+            if (!json.startsWith("[")) return;
+
+            java.util.regex.Pattern collegePattern = java.util.regex.Pattern.compile(
+                "\\{\\s*\"id\"\\s*:\\s*\"([^\"]+)\"([\\s\\S]*?)(?=\\{\\s*\"id\"|\\s*\\])", 
+                java.util.regex.Pattern.MULTILINE);
+            java.util.regex.Matcher m = collegePattern.matcher(json);
+            
+            int loaded = 0;
+            while (m.find()) {
+                String id = m.group(1);
+                String body = m.group(2);
+                
+                String name = extractString(body, "name", id);
+                String shortCode = extractString(body, "shortCode", id);
+                String state = extractString(body, "state", "All India");
+                String type = extractString(body, "type", "Engineering");
+                int nirfRank = extractInt(body, "nirfRank", 100);
+                double tuition = extractDouble(body, "annualTuition", 100000);
+                double hostel = extractDouble(body, "annualHostel", 40000);
+                String board = extractString(body, "counsellingBoard", "JoSAA / CSAB");
+                double hsDiscount = state.equalsIgnoreCase("Jharkhand") ? 3.0 : 0.0;
+                
+                College col = new College(id, name, shortCode, state, type, nirfRank, tuition, hostel, true, board, hsDiscount);
+                
+                java.util.regex.Pattern branchPattern = java.util.regex.Pattern.compile("\"([A-Za-z0-9_ &\\-]+)\"\\s*:\\s*\\{([^}]+)\\}");
+                java.util.regex.Matcher bm = branchPattern.matcher(body);
+                while (bm.find()) {
+                    String branch = bm.group(1);
+                    String catBlock = bm.group(2);
+                    java.util.regex.Pattern catPattern = java.util.regex.Pattern.compile("\"([^\"]+)\"\\s*:\\s*([0-9.]+)");
+                    java.util.regex.Matcher cm = catPattern.matcher(catBlock);
+                    while (cm.find()) {
+                        String category = cm.group(1);
+                        double cutoff = Double.parseDouble(cm.group(2));
+                        col.addBranchCutoff(branch, category, cutoff);
+                    }
+                }
+                
+                colleges.put(col.getId(), col);
+                loaded++;
+            }
+            
+            if (loaded > 0) {
+                System.out.println("[DataStore] Loaded " + loaded + " dynamic live-scraped colleges.");
+            }
+        } catch (Exception e) {
+            System.err.println("[DataStore] Notice loading dynamic colleges: " + e.getMessage());
+        }
+    }
+
+    private static String extractString(String src, String key, String defaultVal) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"").matcher(src);
+        return m.find() ? m.group(1) : defaultVal;
+    }
+
+    private static int extractInt(String src, String key, int defaultVal) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"" + key + "\"\\s*:\\s*(\\d+)").matcher(src);
+        return m.find() ? Integer.parseInt(m.group(1)) : defaultVal;
+    }
+
+    private static double extractDouble(String src, String key, double defaultVal) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"" + key + "\"\\s*:\\s*([0-9.]+)").matcher(src);
+        return m.find() ? Double.parseDouble(m.group(1)) : defaultVal;
+    }
 }

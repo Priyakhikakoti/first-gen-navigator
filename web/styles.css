@@ -2902,11 +2902,50 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
   padding: 0.1rem 0.4rem;
   border-radius: var(--radius-full);
-}
-
 [hidden] { display: none !important; }
 
-
-  .analysis-payment-card { padding: 1.25rem; }
-  .payment-qr-panel { min-height: 240px; }
+/* Live Web Scraper Badges & Buttons */
+.badge-live-scraped {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
+
+.btn-live-scrape {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  border: none;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 0 2px 4px rgba(4, 120, 87, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-live-scrape:hover {
+  background: linear-gradient(135deg, #047857, #065f46);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(4, 120, 87, 0.35);
+}
+
+.btn-live-scrape:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+

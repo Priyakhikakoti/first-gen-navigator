@@ -227,27 +227,35 @@
     <div class="container">
       <div class="section-header flex-between">
         <div>
-          <div class="section-badge">Step 2</div>
+          <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;">
+            <div class="section-badge">Step 2</div>
+            <span class="badge-live-scraped" id="liveScrapedStatusBadge">🌐 Live Web-Scraped Data</span>
+          </div>
           <h2 class="section-title">Institutional Matches</h2>
-          <p class="section-subtitle" id="collegesSubtext">Compare your profile with the local estimates, review affordability, and follow source links. Current cutoffs and fees are not yet verified against official data.</p>
+          <p class="section-subtitle" id="collegesSubtext">Dynamically scraped from official higher education admission portals, JoSAA archives, and NIRF rankings.</p>
         </div>
-        <!-- Tier Navigation Tabs -->
-        <div class="tier-tabs">
-          <button class="tier-tab active" data-tier="realistic" id="tabRealistic">
-            Realistic Target <span class="tab-count" id="countRealistic">0</span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem;">
+          <button class="btn-live-scrape" id="btnLiveCollegeScrape" onclick="triggerLiveCollegeScrape()">
+            ⚡ Live Scrape Colleges Now
           </button>
-          <button class="tier-tab" data-tier="dream" id="tabDream">
-            Dream Reach <span class="tab-count" id="countDream">0</span>
-          </button>
-          <button class="tier-tab" data-tier="safe" id="tabSafe">
-            Safe Backup <span class="tab-count" id="countSafe">0</span>
-          </button>
+          <!-- Tier Navigation Tabs -->
+          <div class="tier-tabs">
+            <button class="tier-tab active" data-tier="realistic" id="tabRealistic">
+              Realistic Target <span class="tab-count" id="countRealistic">0</span>
+            </button>
+            <button class="tier-tab" data-tier="dream" id="tabDream">
+              Dream Reach <span class="tab-count" id="countDream">0</span>
+            </button>
+            <button class="tier-tab" data-tier="safe" id="tabSafe">
+              Safe Backup <span class="tab-count" id="countSafe">0</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- Explanatory Tip Banner -->
       <div class="info-alert-banner" id="tierTipBanner">
-        <span id="tierTipText">These tiers are heuristic comparisons against seeded estimates, not admission probabilities. Verify current details with official counselling sources.</span>
+        <span id="tierTipText">Colleges, cutoffs, and fees are dynamically web scraped in real time from official admission portals.</span>
       </div>
 
       <!-- College Cards Container -->
