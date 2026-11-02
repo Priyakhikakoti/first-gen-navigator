@@ -16,9 +16,6 @@
 
 const API_BASE = '';
 let initializedAuthUserId = null;
-let paymentPollTimer = null;
-let paymentCheckInFlight = false;
-let pendingPaymentCallback = null;
 
 // ─── Global State ─────────────────────────────────────────────────────────────
 const state = {
@@ -34,9 +31,6 @@ const state = {
   translations: {},
   currentUser: null,           // Supabase user
   authReady: false,
-  activeAnalysisId: null,
-  pendingAnalysisId: null,
-  pendingPaymentQrCodeId: null,
   deadlineFilter: 'all',       // 'all', 'high-risk', 'admission', 'scholarship'
   selectedCompareColleges: [], // array of college objects (max 3)
   selectedCompareScholarships: [], // array of scholarship objects (max 3)
@@ -46,26 +40,17 @@ const state = {
 };
 
 async function apiFetch(url, options = {}) {
-  if (!window.FGNAuth || !state.currentUser || !state.activeAnalysisId) {
-    throw new Error('Sign in and pay for an analysis before requesting app data.');
+  if (!window.FGNAuth || !state.currentUser) {
+    throw new Error('Sign in before requesting app data.');
   }
   const token = await window.FGNAuth.getAccessToken();
   if (!token) throw new Error('Your session expired. Sign in again to continue.');
 
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
-  headers.set('X-FGN-Analysis-Id', state.activeAnalysisId);
   return fetch(url, { ...options, headers });
 }
 
-async function paymentFetch(url, options = {}) {
-  if (!window.FGNAuth || !state.currentUser) throw new Error('Sign in to continue.');
-  const token = await window.FGNAuth.getAccessToken();
-  if (!token) throw new Error('Your session expired. Sign in again to continue.');
-  const headers = new Headers(options.headers || {});
-  headers.set('Authorization', `Bearer ${token}`);
-  return fetch(url, { ...options, headers });
-}
 
 // ─── Formatting Helpers ───────────────────────────────────────────────────────
 function formatINR(num) {
@@ -399,14 +384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function handleAuthSession(user) {
   if (!user) {
-    if (paymentPollTimer) window.clearInterval(paymentPollTimer);
-    paymentPollTimer = null;
-    paymentCheckInFlight = false;
-    pendingPaymentCallback = null;
     initializedAuthUserId = null;
-    state.activeAnalysisId = null;
-    state.pendingAnalysisId = null;
-    state.pendingPaymentQrCodeId = null;
     state.authReady = true;
     updateAuthUI(null);
     return;
@@ -417,15 +395,8 @@ async function handleAuthSession(user) {
     updateAuthUI(user);
     return;
   }
-  if (paymentPollTimer) window.clearInterval(paymentPollTimer);
-  paymentPollTimer = null;
-  paymentCheckInFlight = false;
-  pendingPaymentCallback = null;
   state.student = null;
   initializedAuthUserId = user.id;
-  state.activeAnalysisId = null;
-  state.pendingAnalysisId = null;
-  state.pendingPaymentQrCodeId = null;
   updateAuthUI(user);
 
   const savedProfile = getSavedPendingProfile(user.id);
@@ -464,7 +435,7 @@ function setupEventListeners() {
   const btnRefresh = document.getElementById('btnQuickRecalc');
   if (btnRefresh) {
     btnRefresh.addEventListener('click', async () => {
-      await startPaidAnalysis(async () => {
+      try {
         if (state.student) {
           const response = await apiFetch(`${API_BASE}/api/profile`, {
             method: 'POST',
@@ -474,8 +445,11 @@ function setupEventListeners() {
           if (!response.ok) throw new Error('Could not load your profile for this analysis.');
         }
         await loadAllData();
-        showToast('Payment approved. Your analysis has been refreshed.');
-      });
+        showToast('Your analysis has been refreshed.');
+      } catch (error) {
+        console.error('Refresh failed:', error);
+        showToast(error.message || 'Could not refresh. Please try again.');
+      }
     });
   }
 
@@ -2388,14 +2362,15 @@ async function saveProfile() {
   if (state.currentUser) {
     sessionStorage.setItem(`fgn-pending-profile:${state.currentUser.id}`, JSON.stringify(s));
   }
-  await startPaidAnalysis(async () => {
+
+  try {
     state.student = s;
     const response = await apiFetch(`${API_BASE}/api/profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(s)
     });
-    if (!response.ok) throw new Error('Could not update your profile for this analysis.');
+    if (!response.ok) throw new Error('Could not update your profile.');
 
     if (state.currentUser && window.FGNDB) {
       const { error } = await window.FGNDB.upsertProfile(state.currentUser.id, s);
@@ -2404,7 +2379,7 @@ async function saveProfile() {
     if (state.currentUser) sessionStorage.removeItem(`fgn-pending-profile:${state.currentUser.id}`);
 
     updateHeroSummary(s);
-    showToast(`Payment approved. Profile updated for ${s.name}. Recalculating cutoffs & grants.`);
+    showToast(`Profile updated for ${s.name}. Recalculating cutoffs & grants.`);
     await Promise.allSettled([
       loadColleges(),
       loadScholarships(),
@@ -2415,7 +2390,10 @@ async function saveProfile() {
     runApplicationErrorChecks();
     updateReadinessScore();
     updateWhatNextActions();
-  });
+  } catch (error) {
+    console.error('Profile save failed:', error);
+    showToast(error.message || 'Could not save profile. Please try again.');
+  }
 }
 
 function getSavedPendingProfile(userId) {
@@ -2505,7 +2483,6 @@ function updateAuthUI(user) {
   state.currentUser = user;
   const appShell = document.getElementById('appShell');
   const authGate = document.getElementById('authGate');
-  const paymentGate = document.getElementById('analysisPaymentGate');
   const dot = document.getElementById('authIndicatorDot');
   const statusText = document.getElementById('authStatusText');
   const btnLogin = document.getElementById('btnOpenLogin');
@@ -2514,13 +2491,10 @@ function updateAuthUI(user) {
   const progressPrompt = document.getElementById('progressLoginPrompt');
 
   if (user) {
-    const hasPaidAnalysis = Boolean(state.activeAnalysisId);
-    const paymentPending = Boolean(state.pendingAnalysisId);
-    if (appShell) appShell.hidden = paymentPending;
+    if (appShell) appShell.hidden = false;
     if (authGate) authGate.hidden = true;
-    if (paymentGate) paymentGate.hidden = !paymentPending;
     document.querySelectorAll('[data-analysis-required]').forEach(element => {
-      element.hidden = !hasPaidAnalysis;
+      element.hidden = false;
     });
     if (dot) dot.classList.add('logged-in');
     if (statusText) statusText.textContent = `Signed in as ${user.user_metadata?.full_name || user.email} — synced to cloud.`;
@@ -2528,12 +2502,9 @@ function updateAuthUI(user) {
     if (btnSignup) btnSignup.style.display = 'none';
     if (btnSignOut) btnSignOut.style.display = '';
     if (progressPrompt) progressPrompt.style.display = 'none';
-    const paymentSignOut = document.getElementById('btnPaymentSignOut');
-    if (paymentSignOut) paymentSignOut.hidden = false;
   } else {
     if (appShell) appShell.hidden = true;
     if (authGate) authGate.hidden = false;
-    if (paymentGate) paymentGate.hidden = true;
     if (dot) dot.classList.remove('logged-in');
     if (statusText) statusText.textContent = 'Not signed in.';
     if (btnLogin) btnLogin.style.display = '';
@@ -2567,177 +2538,16 @@ function showAuthGateMessage(message) {
   if (element) element.textContent = message;
 }
 
-function createAnalysisId() {
-  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-  const values = new Uint8Array(16);
-  window.crypto.getRandomValues(values);
-  values[6] = (values[6] & 0x0f) | 0x40;
-  values[8] = (values[8] & 0x3f) | 0x80;
-  const hex = Array.from(values, value => value.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
-function setPaymentGateStatus(message) {
-  const status = document.getElementById('paymentGateStatus');
-  if (status) status.textContent = message;
-}
 
-function setPaymentGateError(message) {
-  const error = document.getElementById('paymentGateError');
-  if (error) error.textContent = message;
-}
 
-async function startPaidAnalysis(onPaid, analysisId = createAnalysisId()) {
-  if (!state.currentUser || !window.FGNAuth) {
-    openAuthGate();
-    return;
-  }
 
-  if (paymentPollTimer) window.clearInterval(paymentPollTimer);
-  paymentPollTimer = null;
-  state.activeAnalysisId = null;
-  state.pendingAnalysisId = analysisId;
-  state.pendingPaymentQrCodeId = null;
-  sessionStorage.setItem(`fgn-pending-analysis:${state.currentUser.id}`, analysisId);
-  pendingPaymentCallback = onPaid;
-  paymentCheckInFlight = false;
-  updateAuthUI(state.currentUser);
 
-  const image = document.getElementById('paymentQrImage');
-  const placeholder = document.getElementById('paymentQrPlaceholder');
-  const placeholderStatus = document.getElementById('paymentQrStatus');
-  const checkButton = document.getElementById('btnCheckPayment');
-  const error = document.getElementById('paymentGateError');
-  if (image) {
-    image.hidden = true;
-    image.removeAttribute('src');
-  }
-  if (placeholder) placeholder.hidden = false;
-  if (placeholderStatus) placeholderStatus.textContent = 'Preparing your secure UPI QR...';
-  if (checkButton) {
-    checkButton.disabled = true;
-    checkButton.textContent = "I've paid — check payment";
-  }
-  if (error) error.textContent = '';
-  const retryButton = document.getElementById('btnRetryPayment');
-  if (retryButton) retryButton.hidden = true;
-  setPaymentGateStatus('Pay ₹50 using this single-use Razorpay QR. Razorpay verifies your payment before starting the analysis.');
-
-  try {
-    const response = await paymentFetch(`${API_BASE}/api/payments/qr`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ analysisId })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Could not prepare a payment QR.');
-    if (result.status === 'paid') {
-      await completePaidAnalysis(analysisId);
-      return;
-    }
-    const qrUrl = new URL(result.imageUrl);
-    if (qrUrl.protocol !== 'https:' || !result.qrCodeId) {
-      throw new Error('Razorpay returned an invalid QR. Please try again.');
-    }
-    state.pendingPaymentQrCodeId = result.qrCodeId;
-    if (image) {
-      image.onload = () => {
-        image.hidden = false;
-        if (placeholder) placeholder.hidden = true;
-      };
-      image.onerror = () => {
-        image.hidden = true;
-        if (placeholderStatus) placeholderStatus.textContent = 'Razorpay QR image could not be loaded.';
-      };
-      image.src = qrUrl.href;
-    }
-    if (checkButton) checkButton.disabled = false;
-    if (result.mode === 'test') {
-      setPaymentGateStatus('TEST MODE: This QR is for testing and cannot collect a real UPI payment. To pay ₹50, configure matching Razorpay live-mode keys in .env and restart the server.');
-    } else {
-      setPaymentGateStatus('Scan the QR with a supported UPI app and pay exactly ₹50. This QR is single-use and expires after 30 minutes.');
-    }
-    paymentPollTimer = window.setInterval(() => checkAnalysisPayment(false), 5000);
-  } catch (requestError) {
-    console.error('Unable to start paid analysis:', requestError);
-    if (placeholderStatus) placeholderStatus.textContent = 'Payment QR is not available.';
-    setPaymentGateError(requestError.message || 'Could not prepare payment. Please try again.');
-    if (retryButton) retryButton.hidden = false;
-  }
-}
-
-async function checkAnalysisPayment(manual = true) {
-  if (paymentCheckInFlight || !state.pendingAnalysisId || !state.pendingPaymentQrCodeId || !window.FGNAuth) return;
-  paymentCheckInFlight = true;
-  const checkButton = document.getElementById('btnCheckPayment');
-  if (manual && checkButton) {
-    checkButton.disabled = true;
-    checkButton.textContent = 'Checking payment...';
-  }
-
-  try {
-    const response = await paymentFetch(
-      `${API_BASE}/api/payments/qr/${encodeURIComponent(state.pendingPaymentQrCodeId)}`
-    );
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || 'Could not check payment status.');
-    if (result.status === 'paid' && result.analysisId === state.pendingAnalysisId) {
-      await completePaidAnalysis(result.analysisId);
-    } else if (result.status === 'expired') {
-      if (paymentPollTimer) window.clearInterval(paymentPollTimer);
-      paymentPollTimer = null;
-      setPaymentGateStatus('This payment QR has expired. Generate a new QR to continue.');
-      const retryButton = document.getElementById('btnRetryPayment');
-      if (retryButton) retryButton.hidden = false;
-      if (checkButton) checkButton.disabled = true;
-    } else if (manual) {
-      setPaymentGateStatus('Payment not confirmed yet. If you have paid, wait a moment and check again.');
-    }
-  } catch (error) {
-    if (manual) {
-      console.error('Payment status check failed:', error);
-      setPaymentGateError(error.message || 'Could not verify payment. Please retry.');
-    } else {
-      console.error('Automatic payment status check failed:', error);
-      setPaymentGateStatus('Razorpay verification is temporarily unavailable. We will keep checking; you can also check manually.');
-    }
-  } finally {
-    paymentCheckInFlight = false;
-    if (manual && checkButton && state.pendingAnalysisId) {
-      checkButton.disabled = false;
-      checkButton.textContent = "I've paid — check payment";
-    }
-  }
-}
-
-async function completePaidAnalysis(analysisId) {
-  if (!analysisId || analysisId !== state.pendingAnalysisId || !state.currentUser) return;
-  if (paymentPollTimer) window.clearInterval(paymentPollTimer);
-  paymentPollTimer = null;
-
-  const onPaid = pendingPaymentCallback;
-  state.activeAnalysisId = analysisId;
-  state.pendingAnalysisId = null;
-  if (state.currentUser) sessionStorage.removeItem(`fgn-pending-analysis:${state.currentUser.id}`);
-  pendingPaymentCallback = null;
-  updateAuthUI(state.currentUser);
-  showToast('Payment approved. Your analysis is starting.');
-
-  try {
-    if (onPaid) await onPaid();
-  } catch (error) {
-    console.error('Paid analysis could not be completed:', error);
-    showToast(error.message || 'Payment was verified, but the analysis could not be loaded. Use Refresh Matches to try again.');
-  }
-}
 
 function setupAuthListeners() {
   const btnLogin = document.getElementById('btnOpenLogin');
   const btnSignup = document.getElementById('btnOpenSignup');
   const btnSignOut = document.getElementById('btnSignOut');
-  const btnPaymentSignOut = document.getElementById('btnPaymentSignOut');
-  const btnCheckPayment = document.getElementById('btnCheckPayment');
-  const btnRetryPayment = document.getElementById('btnRetryPayment');
 
   if (btnLogin) btnLogin.addEventListener('click', () => switchAuthTab('login'));
   if (btnSignup) btnSignup.addEventListener('click', () => switchAuthTab('signup'));
@@ -2757,26 +2567,6 @@ function setupAuthListeners() {
       }
     });
   }
-  if (btnPaymentSignOut && window.FGNAuth) {
-    btnPaymentSignOut.addEventListener('click', async () => {
-      btnPaymentSignOut.disabled = true;
-      try {
-        const { error } = await window.FGNAuth.signOut();
-        if (error) throw error;
-        await handleAuthSession(null);
-      } catch (error) {
-        console.error('Sign out failed:', error);
-        showToast(error.message || 'Could not sign out. Please try again.');
-      } finally {
-        btnPaymentSignOut.disabled = false;
-      }
-    });
-  }
-  if (btnCheckPayment) btnCheckPayment.addEventListener('click', () => checkAnalysisPayment(true));
-  if (btnRetryPayment) btnRetryPayment.addEventListener('click', () => {
-    const callback = pendingPaymentCallback;
-    startPaidAnalysis(callback || (async () => loadAllData()));
-  });
 
   const loginForm = document.getElementById('loginForm');
   if (loginForm) {
