@@ -15,6 +15,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { Anakin } from '@anakin-io/sdk';
+import crypto from 'crypto';
+import dns from 'node:dns/promises';
+import https from 'node:https';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -25,15 +28,62 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 
 const app = express();
-const PORT = process.env.SCRAPER_PORT || 3001;
+const PORT = process.env.PORT || process.env.SCRAPER_PORT || 3001;
 
-const client = new Anakin({ apiKey: process.env.ANAKIN_API_KEY });
+const client = process.env.ANAKIN_API_KEY
+  ? new Anakin({ apiKey: process.env.ANAKIN_API_KEY })
+  : null;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 
 // ─── Serve static web files ──────────────────────────────────────────────────
 app.use(express.static(path.join(ROOT, 'web')));
+
+async function httpsJsonRequest(url, options = {}) {
+  const hostname = new URL(url).hostname;
+  let addresses;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      addresses = await dns.lookup(hostname, { all: true });
+      break;
+    } catch (error) {
+      if (!['ENOTFOUND', 'EAI_AGAIN'].includes(error.code) || attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(url, {
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      agent: false,
+      lookup: (_hostname, lookupOptions, callback) => {
+        if (lookupOptions.all) return callback(null, addresses);
+        const address = addresses.find(item => !lookupOptions.family || item.family === lookupOptions.family);
+        if (!address) return callback(new Error('No compatible network address was found for the remote service.'));
+        return callback(null, address.address, address.family);
+      }
+    }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status: response.statusCode,
+          text: async () => body,
+          json: async () => JSON.parse(body)
+        });
+      });
+    });
+    request.setTimeout(15000, () => {
+      request.destroy(new Error('The remote request timed out. Please try again.'));
+    });
+    request.on('error', reject);
+    request.end(options.body);
+  });
+}
 
 // ─── Data Helpers ────────────────────────────────────────────────────────────
 
@@ -616,10 +666,6 @@ function buildScholarshipsFromScraped(data, student) {
   });
 }
 
-// ─── In-memory student state ──────────────────────────────────────────────────
-
-let currentStudent = defaultStudent();
-
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
 // Health
@@ -627,27 +673,61 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'UP', system: 'First Gen Navigator (Anakin-Powered)', port: PORT });
 });
 
+async function getSupabaseUser(req) {
+  const authorization = req.get('authorization') || '';
+  const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) return null;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+
+  const response = await httpsJsonRequest(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${token}`
+    }
+  });
+  if (!response.ok) return null;
+  return response.json();
+}
+
+app.use('/api', async (req, res, next) => {
+  try {
+    const user = await getSupabaseUser(req);
+    if (!user?.id) return res.status(401).json({ error: 'Sign in is required.' });
+
+    req.authUser = user;
+    req.student = studentsByUser.get(user.id) || defaultStudent();
+    return next();
+  } catch (error) {
+    console.error('Could not authorize API request:', error);
+    return res.status(error.statusCode || 503).json({ error: error.message || 'Could not verify access.' });
+  }
+});
+
 // Profile
 app.get('/api/profile', (req, res) => {
-  res.json(currentStudent);
+  res.json(req.student);
 });
 
 app.post('/api/profile', (req, res) => {
-  currentStudent = { ...currentStudent, ...req.body };
-  res.json(currentStudent);
+  const student = { ...req.student, ...req.body };
+  studentsByUser.set(req.authUser.id, student);
+  res.json(student);
 });
 
 // Colleges (real data from Anakin scrape)
 app.get('/api/colleges', (req, res) => {
   const data = loadEnrichedData();
-  const result = buildCollegesFromScraped(data, currentStudent);
+  const result = buildCollegesFromScraped(data, req.student);
   res.json(result);
 });
 
 // Scholarships (real data from Anakin scrape)
 app.get('/api/scholarships', (req, res) => {
   const data = loadEnrichedData();
-  const result = buildScholarshipsFromScraped(data, currentStudent);
+  const result = buildScholarshipsFromScraped(data, req.student);
   res.json(result);
 });
 
@@ -660,11 +740,11 @@ app.get('/api/affordability', (req, res) => {
   if (!college) return res.status(404).json({ error: 'College not found' });
 
   const customSch = Number(customScholarship || 0);
-  const autoSch = getApplicableScholarship(currentStudent, college);
+  const autoSch = getApplicableScholarship(req.student, college);
   const applicableScholarship = Math.max(customSch, autoSch);
 
   const netCost = Math.max(0, college.annualTuition + college.annualHostel - applicableScholarship);
-  const budget = Number(currentStudent.annualBudget || 1);
+  const budget = Number(req.student.annualBudget || 1);
   const tier = getAffordabilityTier(netCost, budget);
 
   res.json({
@@ -681,7 +761,7 @@ app.get('/api/affordability', (req, res) => {
 
 // Alternatives / Pathways
 app.get('/api/alternatives', (req, res) => {
-  const s = currentStudent;
+  const s = req.student;
   const pct = Number(s.jeePercentile || 75);
   const cat = s.category || 'GEN';
   const branch = s.preferredBranch || 'CSE';
@@ -745,7 +825,7 @@ function normalizeDocType(type) {
   return clean;
 }
 
-const documentVault = [
+const defaultDocumentVault = [
   { id: 'DOC-01', documentType: 'Income Certificate',              fileName: null,                        status: 'Pending',  issuer: 'Tehsildar / SDM Office',         notes: 'Required for all income-based scholarships and EWS/OBC-NCL quota.',    critical: true  },
   { id: 'DOC-02', documentType: 'Caste Certificate',               fileName: null,                        status: 'Pending',  issuer: 'District Magistrate Office',      notes: 'Mandatory for OBC-NCL / SC / ST / EWS quota seat allocation.',        critical: true  },
   { id: 'DOC-03', documentType: 'Domicile Certificate',            fileName: null,                        status: 'Pending',  issuer: 'SDM / Tehsildar Office',         notes: 'Required for home-state quota at NITs and state colleges.',           critical: true  },
@@ -756,7 +836,19 @@ const documentVault = [
   { id: 'DOC-08', documentType: 'Bank Details',                    fileName: null,                        status: 'Pending',  issuer: 'Nationalized Bank',              notes: 'For scholarship disbursement — first page with IFSC and account no.', critical: false }
 ];
 
-function buildDocumentsResponse() {
+const documentsByUser = new Map();
+const studentsByUser = new Map();
+
+function getDocumentVault(userId) {
+  const uid = userId || 'default';
+  if (!documentsByUser.has(uid)) {
+    documentsByUser.set(uid, defaultDocumentVault.map(document => ({ ...document })));
+  }
+  return documentsByUser.get(uid);
+}
+
+function buildDocumentsResponse(userId) {
+  const documentVault = getDocumentVault(userId);
   const uploaded = documentVault.filter(d => d.status === 'Uploaded' || d.status === 'Verified').length;
   const total    = documentVault.length;
   const missing  = total - uploaded;
@@ -771,7 +863,7 @@ function buildDocumentsResponse() {
 
 // GET /api/documents
 app.get('/api/documents', (req, res) => {
-  res.json(buildDocumentsResponse());
+  res.json(buildDocumentsResponse(req.authUser?.id));
 });
 
 // POST /api/documents — called by confirmDocumentUpload() in app.js
@@ -782,7 +874,7 @@ app.post('/api/documents', (req, res) => {
     return res.status(400).json({ error: 'documentType is required' });
   }
 
-  // Find existing doc by type (normalized matching) or create a new one
+  const documentVault = getDocumentVault(req.authUser?.id);
   const targetNorm = normalizeDocType(documentType);
   const existing = documentVault.find(
     d => normalizeDocType(d.documentType) === targetNorm || d.documentType.toLowerCase() === documentType.toLowerCase()
@@ -804,9 +896,8 @@ app.post('/api/documents', (req, res) => {
     });
   }
 
-  res.json(buildDocumentsResponse());
+  res.json(buildDocumentsResponse(req.authUser.id));
 });
-
 
 // Deadlines
 app.get('/api/deadlines', (req, res) => {
@@ -899,7 +990,7 @@ app.get('/api/why-match', async (req, res) => {
 
   if (!college) return res.status(404).json({ error: 'College not found' });
 
-  const s = currentStudent;
+  const s = req.student;
   const cat = s.category || 'GEN';
   const branch = s.preferredBranch || 'CSE';
   const pct = Number(s.jeePercentile || 85);

@@ -39,6 +39,19 @@ const state = {
   tempUploadedFile: null       // pending file verification in upload modal
 };
 
+async function apiFetch(url, options = {}) {
+  if (!window.FGNAuth || !state.currentUser) {
+    throw new Error('Sign in before requesting app data.');
+  }
+  const token = await window.FGNAuth.getAccessToken();
+  if (!token) throw new Error('Your session expired. Sign in again to continue.');
+
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', `Bearer ${token}`);
+  return fetch(url, { ...options, headers });
+}
+
+
 // ─── Formatting Helpers ───────────────────────────────────────────────────────
 function formatINR(num) {
   if (num === null || num === undefined || isNaN(num)) return '₹0';
@@ -380,7 +393,6 @@ function classifyCertificateText(extractedText, originalFileName, targetType) {
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupAuthListeners();
-  setupFlowScrollListener();
 
   document.addEventListener('fgn:authchange', event => {
     const user = event.detail?.session?.user || null;
@@ -412,24 +424,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function handleAuthSession(user) {
-  state.authReady = true;
-  updateAuthUI(user);
-
   if (!user) {
     initializedAuthUserId = null;
+    state.authReady = true;
+    updateAuthUI(null);
     return;
   }
 
-  if (initializedAuthUserId === user.id) return;
-  initializedAuthUserId = user.id;
-
-  await loadAllData();
-  if (state.currentUser?.id !== user.id) return;
-  if (window.FGNDB) {
-    await syncProfileFromSupabase();
-    await syncDocumentsFromSupabase();
+  state.authReady = true;
+  if (initializedAuthUserId === user.id) {
+    updateAuthUI(user);
+    return;
   }
-  if (state.currentUser?.id === user.id) await loadProgress();
+  state.student = null;
+  initializedAuthUserId = user.id;
+  updateAuthUI(user);
+
+  const savedProfile = getSavedPendingProfile(user.id);
+  const emptyProfile = {
+    name: user.user_metadata?.full_name || '',
+    jeePercentile: '',
+    category: 'OBC-NCL',
+    state: 'Jharkhand',
+    preferredBranch: 'CSE',
+    annualIncome: '',
+    annualBudget: ''
+  };
+  populateProfileForm(savedProfile || emptyProfile);
+  if (savedProfile) {
+    state.student = savedProfile;
+    updateHeroSummary(savedProfile);
+  }
+
+  if (window.FGNDB) {
+    syncProfileFromSupabase(user.id).then(() => {
+      if (state.currentUser?.id !== user.id) return;
+      if (savedProfile) {
+        state.student = savedProfile;
+        populateProfileForm(savedProfile);
+        updateHeroSummary(savedProfile);
+      }
+    }).catch(error => {
+      console.error('Could not load the saved profile:', error);
+    });
+  }
 }
 
 // ─── Global Event Listeners ───────────────────────────────────────────────────
@@ -438,8 +476,21 @@ function setupEventListeners() {
   const btnRefresh = document.getElementById('btnQuickRecalc');
   if (btnRefresh) {
     btnRefresh.addEventListener('click', async () => {
-      await loadAllData();
-      showToast('All college cutoffs and feasibility calculations updated.');
+      try {
+        if (state.student) {
+          const response = await apiFetch(`${API_BASE}/api/profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state.student)
+          });
+          if (!response.ok) throw new Error('Could not load your profile for this analysis.');
+        }
+        await loadAllData();
+        showToast('Your analysis has been refreshed.');
+      } catch (error) {
+        console.error('Refresh failed:', error);
+        showToast(error.message || 'Could not refresh. Please try again.');
+      }
     });
   }
 
@@ -769,7 +820,7 @@ async function confirmDocumentUpload() {
 
   // 2. Post to Local API if running
   try {
-    await fetch(`${API_BASE}/api/documents`, {
+    await apiFetch(`${API_BASE}/api/documents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ documentType: docType, fileName: fileName, status: docRecord.status })
@@ -967,7 +1018,7 @@ async function loadDocuments() {
     // 1. Fetch default templates from server or fallback
     let serverDocs = [];
     try {
-      const res = await fetch(`${API_BASE}/api/documents`);
+      const res = await apiFetch(`${API_BASE}/api/documents`);
       if (res.ok) {
         const data = await res.json();
         serverDocs = data.documents || [];
@@ -1806,7 +1857,7 @@ function renderCompareMatrix() {
 // ─── College Matching Engine ──────────────────────────────────────────────────
 async function loadColleges() {
   try {
-    const res = await fetch(`${API_BASE}/api/colleges`);
+    const res = await apiFetch(`${API_BASE}/api/colleges`);
     if (!res.ok) return;
     state.collegeData = await res.json();
 
@@ -2031,7 +2082,7 @@ function updateTierTip() {
 // ─── Unified Scholarship Matching Engine ──────────────────────────────────────
 async function loadScholarships() {
   try {
-    const res = await fetch(`${API_BASE}/api/scholarships`);
+    const res = await apiFetch(`${API_BASE}/api/scholarships`);
     if (!res.ok) return;
     state.scholarships = await res.json();
 
@@ -2185,7 +2236,7 @@ async function calculateAffordability() {
   if (!collegeId) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/affordability?collegeId=${encodeURIComponent(collegeId)}&scholarship=${encodeURIComponent(customScholarship)}`);
+    const res = await apiFetch(`${API_BASE}/api/affordability?collegeId=${encodeURIComponent(collegeId)}&scholarship=${encodeURIComponent(customScholarship)}`);
     if (!res.ok) return;
     const data = await res.json();
 
@@ -2229,7 +2280,7 @@ async function calculateAffordability() {
 // ─── Alternative Pathways ─────────────────────────────────────────────────────
 async function loadAlternatives() {
   try {
-    const res = await fetch(`${API_BASE}/api/alternatives`);
+    const res = await apiFetch(`${API_BASE}/api/alternatives`);
     if (!res.ok) return;
     state.alternatives = await res.json();
 
@@ -2261,7 +2312,7 @@ async function loadAlternatives() {
 // ─── Deadlines & Deadline Risk Monitoring Engine ──────────────────────────────
 async function loadDeadlines() {
   try {
-    const res = await fetch(`${API_BASE}/api/deadlines`);
+    const res = await apiFetch(`${API_BASE}/api/deadlines`);
     if (!res.ok) return;
     const data = await res.json();
     state.deadlines = data.deadlines || [];
@@ -2368,7 +2419,7 @@ function renderDeadlines() {
 // ─── Dynamic Roadmap Timeline ─────────────────────────────────────────────────
 async function loadRoadmap() {
   try {
-    const res = await fetch(`${API_BASE}/api/roadmap`);
+    const res = await apiFetch(`${API_BASE}/api/roadmap`);
     if (!res.ok) return;
     state.roadmap = await res.json();
     renderRoadmap();
@@ -2417,7 +2468,7 @@ async function openWhyMatchModal(collegeId, collegeName) {
   if (modal) modal.classList.add('open');
 
   try {
-    const res = await fetch(`${API_BASE}/api/why-match?collegeId=${encodeURIComponent(collegeId)}`);
+    const res = await apiFetch(`${API_BASE}/api/why-match?collegeId=${encodeURIComponent(collegeId)}`);
     if (res.ok) {
       const data = await res.json();
       body.innerHTML = `
@@ -2436,7 +2487,7 @@ async function openWhyMatchModal(collegeId, collegeName) {
 // ─── Profile Persistence ──────────────────────────────────────────────────────
 async function loadProfile() {
   try {
-    const res = await fetch(`${API_BASE}/api/profile`);
+    const res = await apiFetch(`${API_BASE}/api/profile`);
     if (!res.ok) return;
     state.student = await res.json();
     populateProfileForm(state.student);
@@ -2452,22 +2503,22 @@ function populateProfileForm(s) {
   if (nameEl) nameEl.value = s.name || '';
 
   const pctEl = document.getElementById('inputPercentile');
-  if (pctEl) pctEl.value = s.jeePercentile || 92;
+  if (pctEl) pctEl.value = s.jeePercentile ?? '';
 
   const catEl = document.getElementById('inputCategory');
-  if (catEl) catEl.value = s.category || 'OBC-NCL';
+  if (catEl) catEl.value = s.category ?? 'OBC-NCL';
 
   const stEl = document.getElementById('inputState');
-  if (stEl) stEl.value = s.state || 'Jharkhand';
+  if (stEl) stEl.value = s.state ?? 'Jharkhand';
 
   const brEl = document.getElementById('inputBranch');
-  if (brEl) brEl.value = s.preferredBranch || 'CSE';
+  if (brEl) brEl.value = s.preferredBranch ?? 'CSE';
 
   const incEl = document.getElementById('inputIncome');
-  if (incEl) incEl.value = s.annualIncome || 300000;
+  if (incEl) incEl.value = s.annualIncome ?? '';
 
   const budEl = document.getElementById('inputBudget');
-  if (budEl) budEl.value = s.annualBudget || 100000;
+  if (budEl) budEl.value = s.annualBudget ?? '';
 }
 
 function updateHeroSummary(s) {
@@ -2479,46 +2530,70 @@ function updateHeroSummary(s) {
 }
 
 async function saveProfile() {
+  if (!state.currentUser) {
+    openAuthGate();
+    return;
+  }
+
   const s = {
     name: document.getElementById('inputName')?.value || 'Asha Kumar',
-    jeePercentile: parseFloat(document.getElementById('inputPercentile')?.value) || 92.0,
+    jeePercentile: Number(document.getElementById('inputPercentile')?.value),
     category: document.getElementById('inputCategory')?.value || 'OBC-NCL',
     state: document.getElementById('inputState')?.value || 'Jharkhand',
     preferredBranch: document.getElementById('inputBranch')?.value || 'CSE',
-    annualIncome: parseInt(document.getElementById('inputIncome')?.value) || 300000,
-    annualBudget: parseInt(document.getElementById('inputBudget')?.value) || 100000
+    annualIncome: Number(document.getElementById('inputIncome')?.value),
+    annualBudget: Number(document.getElementById('inputBudget')?.value)
   };
 
-  state.student = s;
+  if (state.currentUser) {
+    sessionStorage.setItem(`fgn-pending-profile:${state.currentUser.id}`, JSON.stringify(s));
+  }
 
-  // 1. Post to API
   try {
-    await fetch(`${API_BASE}/api/profile`, {
+    state.student = s;
+    const response = await apiFetch(`${API_BASE}/api/profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(s)
     });
-  } catch (e) {}
+    if (!response.ok) throw new Error('Could not update your profile.');
 
-  // 2. Sync to Supabase
-  if (state.currentUser && window.FGNDB) {
-    await window.FGNDB.upsertProfile(state.currentUser.id, s);
+    if (state.currentUser && window.FGNDB) {
+      const { error } = await window.FGNDB.upsertProfile(state.currentUser.id, s);
+      if (error) throw error;
+    }
+    if (state.currentUser) sessionStorage.removeItem(`fgn-pending-profile:${state.currentUser.id}`);
+
+    updateHeroSummary(s);
+    showToast(`Profile updated for ${s.name}. Recalculating cutoffs & grants.`);
+    await Promise.allSettled([
+      loadColleges(),
+      loadScholarships(),
+      loadAlternatives(),
+      loadDeadlines()
+    ]);
+
+    runApplicationErrorChecks();
+    updateReadinessScore();
+    updateWhatNextActions();
+  } catch (error) {
+    console.error('Profile save failed:', error);
+    showToast(error.message || 'Could not save profile. Please try again.');
   }
+}
 
-  updateHeroSummary(s);
-  showToast(`Profile updated for ${s.name}. Recalculating cutoffs & grants.`);
-
-  // Recalculate everything
-  await Promise.allSettled([
-    loadColleges(),
-    loadScholarships(),
-    loadAlternatives(),
-    loadDeadlines()
-  ]);
-
-  runApplicationErrorChecks();
-  updateReadinessScore();
-  updateWhatNextActions();
+function getSavedPendingProfile(userId) {
+  const key = `fgn-pending-profile:${userId}`;
+  const serialized = sessionStorage.getItem(key);
+  if (!serialized) return null;
+  try {
+    const profile = JSON.parse(serialized);
+    if (profile && typeof profile === 'object' && !Array.isArray(profile)) return profile;
+  } catch (error) {
+    console.error('Could not restore the pending profile update:', error);
+  }
+  sessionStorage.removeItem(key);
+  return null;
 }
 
 function setPreset(name, pct, cat, st, inc, br, bud, btnId) {
@@ -2574,7 +2649,7 @@ async function loadAllData() {
 // ─── Translations & Multi-Language ────────────────────────────────────────────
 async function loadTranslations(lang) {
   try {
-    const res = await fetch(`${API_BASE}/api/translate?lang=${lang}`);
+    const res = await apiFetch(`${API_BASE}/api/translate?lang=${lang}`);
     if (!res.ok) return;
     state.translations = await res.json();
     applyTranslations();
@@ -2609,6 +2684,9 @@ function updateAuthUI(user) {
   if (user) {
     if (appShell) appShell.hidden = false;
     if (authGate) authGate.hidden = true;
+    document.querySelectorAll('[data-analysis-required]').forEach(element => {
+      element.hidden = false;
+    });
     if (dot) dot.classList.add('logged-in');
     if (statusText) statusText.textContent = `Signed in as ${user.user_metadata?.full_name || user.email} — synced to cloud.`;
     if (btnLogin) btnLogin.style.display = 'none';
@@ -2624,6 +2702,9 @@ function updateAuthUI(user) {
     if (btnSignup) btnSignup.style.display = '';
     if (btnSignOut) btnSignOut.style.display = 'none';
     if (progressPrompt) progressPrompt.style.display = '';
+    document.querySelectorAll('[data-analysis-required]').forEach(element => {
+      element.hidden = true;
+    });
   }
 }
 
@@ -2648,6 +2729,12 @@ function showAuthGateMessage(message) {
   if (element) element.textContent = message;
 }
 
+
+
+
+
+
+
 function setupAuthListeners() {
   const btnLogin = document.getElementById('btnOpenLogin');
   const btnSignup = document.getElementById('btnOpenSignup');
@@ -2662,8 +2749,7 @@ function setupAuthListeners() {
       try {
         const { error } = await window.FGNAuth.signOut();
         if (error) throw error;
-        initializedAuthUserId = null;
-        updateAuthUI(null);
+        await handleAuthSession(null);
       } catch (error) {
         console.error('Sign out failed:', error);
         showToast(error.message || 'Could not sign out. Please try again.');
@@ -2841,9 +2927,10 @@ async function loadProgress() {
   });
 }
 
-async function syncProfileFromSupabase() {
+async function syncProfileFromSupabase(userId = state.currentUser?.id) {
   if (!state.currentUser || !window.FGNDB) return;
-  const { data } = await window.FGNDB.getProfile(state.currentUser.id);
+  const { data } = await window.FGNDB.getProfile(userId);
+  if (state.currentUser?.id !== userId) return;
   if (data) {
     state.student = {
       name: data.name,

@@ -2135,7 +2135,6 @@ h1, h2, h3, h4, h5, h6 {
 .step-card-month { font-size: 0.72rem; font-weight: 600; color: var(--color-slate-400); margin-top: 0.3rem; }
 .progress-login-cta { display: flex; align-items: center; }
 
-
 /* ==========================================================================
    APPLICATION ERROR & COMPLIANCE CHECKER
    ========================================================================== */
@@ -2903,4 +2902,11 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
   padding: 0.1rem 0.4rem;
   border-radius: var(--radius-full);
+}
+
+[hidden] { display: none !important; }
+
+
+  .analysis-payment-card { padding: 1.25rem; }
+  .payment-qr-panel { min-height: 240px; }
 }
