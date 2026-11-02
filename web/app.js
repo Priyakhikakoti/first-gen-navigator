@@ -40,15 +40,14 @@ const state = {
 };
 
 async function apiFetch(url, options = {}) {
-  const headers = new Headers(options.headers || {});
-  if (window.FGNAuth && state.currentUser) {
-    try {
-      const token = await window.FGNAuth.getAccessToken();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-    } catch (e) {
-      console.warn('Could not retrieve auth token:', e);
-    }
+  if (!window.FGNAuth || !state.currentUser) {
+    throw new Error('Sign in before requesting app data.');
   }
+  const token = await window.FGNAuth.getAccessToken();
+  if (!token) throw new Error('Your session expired. Sign in again to continue.');
+
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', `Bearer ${token}`);
   return fetch(url, { ...options, headers });
 }
 
@@ -1878,12 +1877,6 @@ async function loadColleges() {
     const statCount = document.getElementById('statCollegesCount');
     if (statCount) statCount.textContent = dCount + rCount + sCount;
 
-    const statusBadge = document.getElementById('liveScrapedStatusBadge');
-    if (statusBadge) {
-      const source = state.collegeData.dataSource || 'Live Web Scraped';
-      statusBadge.textContent = `🌐 ${source}`;
-    }
-
     populateCalculatorDropdown();
     updateRankSummaryBanner();
     renderColleges();
@@ -1891,41 +1884,6 @@ async function loadColleges() {
     console.error('Failed to load colleges:', e);
   }
 }
-
-async function triggerLiveCollegeScrape() {
-  const btn = document.getElementById('btnLiveCollegeScrape');
-  const originalText = btn ? btn.innerHTML : '⚡ Live Scrape Colleges Now';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '⏳ Scraping Live Web Portals...';
-  }
-
-  try {
-    let res = null;
-    try {
-      res = await apiFetch(`${API_BASE}/api/scrape-colleges`, { method: 'POST' });
-    } catch {
-      // Fallback: try port 3001 directly if main server proxies
-      res = await fetch('http://localhost:3001/api/scrape-colleges', { method: 'POST' });
-    }
-
-    await loadColleges();
-
-    const tip = document.getElementById('tierTipText');
-    if (tip) {
-      tip.textContent = 'Colleges and fee structures refreshed from live web scrape just now.';
-    }
-  } catch (err) {
-    console.error('Scrape execution note:', err);
-    await loadColleges();
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = originalText;
-    }
-  }
-}
-window.triggerLiveCollegeScrape = triggerLiveCollegeScrape;
 
 function updateRankSummaryBanner() {
   const cat = state.student?.category || 'OBC-NCL';
@@ -2003,8 +1961,8 @@ function renderColleges() {
         `<li><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(reference.title || reference.url)}</a></li>`
       ).join('')}</ul>`
       : '<p class="college-source-empty">No college-specific source links were found in the latest scrape.</p>';
-    const rankMarkup = nirf ? `<span>Official NIRF Rank #${nirf}</span>` : '<span>NIRF rank unavailable</span>';
-    const categoryBasis = c.cutoffCategory || 'GEN';
+    const rankMarkup = nirf ? `<span>Seeded NIRF rank #${nirf}</span>` : '<span>NIRF rank unavailable</span>';
+    const categoryBasis = c.cutoffCategory || 'unavailable';
     const fallbackNotice = c.requestedBranch && c.requestedBranch !== branch
       ? `Preferred branch ${escapeHtml(c.requestedBranch)} is not listed; showing ${escapeHtml(branch)} instead.`
       : '';
@@ -2012,9 +1970,8 @@ function renderColleges() {
     card.innerHTML = `
       <div class="card-top">
         <div class="card-badges-row">
-          <div style="display:flex; gap:0.4rem; align-items:center;">
+          <div>
             <span class="badge-institute-type">${collegeType}</span>
-            <span class="badge-live-scraped" style="font-size: 0.68rem; padding: 0.15rem 0.45rem;">Live Web Data</span>
           </div>
           ${hsBadge}
         </div>
@@ -2028,16 +1985,16 @@ function renderColleges() {
 
       <div class="card-cutoff-block">
         <div class="cutoff-comparison">
-          <span>Live Scraped Cutoff for <strong>${escapeHtml(branch)}</strong> / ${escapeHtml(categoryBasis)}:</span>
+          <span>Seeded estimate for <strong>${escapeHtml(branch)}</strong> / ${escapeHtml(categoryBasis)}:</span>
           <span class="cutoff-num">${cutoff.toFixed(1)}%ile</span>
         </div>
-        <div class="cutoff-advantage-text">${escapeHtml(c.cutoffBasis || 'Live Web-Scraped Benchmark')}</div>
+        <div class="cutoff-advantage-text">${escapeHtml(c.cutoffBasis || 'Cutoff basis unavailable')}</div>
         <div class="cutoff-bar-bg">
           <div class="cutoff-bar-fill" style="width: ${Math.min(cutoff, 100)}%; background: ${diffColor};"></div>
         </div>
         <div class="cutoff-advantage-text">
           Your score: <strong>${studentPct.toFixed(1)}%ile</strong> 
-          (<span style="color: ${diffColor}; font-weight: 700;">${diffSign}%ile vs. scraped benchmark</span>)
+          (<span style="color: ${diffColor}; font-weight: 700;">${diffSign}%ile vs. estimate</span>)
         </div>
       </div>
 
@@ -2072,15 +2029,15 @@ function renderColleges() {
         </div>
       </div>
       <details class="college-analysis">
-        <summary>Analysis, live source links & notes</summary>
+        <summary>Analysis, data notes & sources</summary>
         <div class="college-analysis-content">
           ${fallbackNotice ? `<p class="college-data-warning">${fallbackNotice}</p>` : ''}
-          <p><strong>Match Benchmark:</strong> ${Math.abs(Number(diff))}%ile ${Number(diff) >= 0 ? 'above' : 'below'} the scraped benchmark.</p>
-          <p><strong>Quota:</strong> ${isHs ? 'Your home state matches this institution; home-state reservation quota applies.' : 'Other-State / All-India quota rules apply.'}</p>
-          <p><strong>Available Branches:</strong> ${escapeHtml((c.availableBranches || []).join(', ') || 'CSE, ECE, IT, ME')}</p>
-          <p><strong>Data Source:</strong> ${escapeHtml(c.dataSource || 'Live Web Scrape (Portals & Knowledge Graph)')}. Live fee structures and JoSAA cutoff benchmarks.</p>
-          <p><strong>Latest Scrape Timestamp:</strong> ${c.dataUpdatedAt ? escapeHtml(new Date(c.dataUpdatedAt).toLocaleString()) : 'Just now'}</p>
-          <p><strong>Live Web References & Official Portals:</strong></p>
+          <p><strong>Match:</strong> ${Math.abs(Number(diff))}%ile ${Number(diff) >= 0 ? 'above' : 'below'} the local estimate. The Dream / Realistic / Safe tier is a heuristic, not an admission probability.</p>
+          <p><strong>Quota:</strong> ${isHs ? 'Your home state matches this institution; actual seat allocation depends on the current counselling rules and seat matrix.' : 'No home-state match indicated for this profile.'}</p>
+          <p><strong>Branches in local dataset:</strong> ${escapeHtml((c.availableBranches || []).join(', ') || 'Not available')}</p>
+          <p><strong>Data quality:</strong> Fees, NIRF rank and cutoff values are seeded estimates and have not been verified from the linked pages. Cutoff comparison uses percentile data and is not an official JoSAA closing rank.</p>
+          <p><strong>Latest scrape:</strong> ${c.dataUpdatedAt ? escapeHtml(new Date(c.dataUpdatedAt).toLocaleString()) : 'No scrape timestamp available'}</p>
+          <p><strong>Scraped references (discovery links, not fact verification):</strong></p>
           ${referenceMarkup}
         </div>
       </details>
@@ -2114,11 +2071,11 @@ function updateTierTip() {
   if (!tipText) return;
   const current = state.currentTier.toLowerCase();
   if (current === 'realistic') {
-    tipText.textContent = 'Realistic targets align closely with live web-scraped cutoff benchmarks (within ±2%ile). Compare your percentile with official round-wise closing ranks.';
+    tipText.textContent = 'Realistic matches are heuristic comparisons against locally seeded percentile estimates, not admission probabilities. Verify current cutoffs with the counselling authority.';
   } else if (current === 'dream') {
-    tipText.textContent = 'Dream reach options are ambitious targets above your current percentile benchmark. Consider ranking them in top JoSAA preference rounds.';
+    tipText.textContent = 'Dream matches are below the local percentile estimate. They are not predictions of late-round or CSAB outcomes; check official round-wise closing ranks.';
   } else {
-    tipText.textContent = 'Safe backups are institutions where your score exceeds the live web-scraped cutoff benchmark (+3%ile or higher).';
+    tipText.textContent = 'Safe matches are heuristic comparisons above the local estimate, not guaranteed or high-probability seats. Confirm eligibility and official cutoffs.';
   }
 }
 

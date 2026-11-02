@@ -28,7 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 
 const app = express();
-const PORT = process.env.SCRAPER_PORT || 3001;
+const PORT = process.env.PORT || process.env.SCRAPER_PORT || 3001;
 
 const client = process.env.ANAKIN_API_KEY
   ? new Anakin({ apiKey: process.env.ANAKIN_API_KEY })
@@ -163,8 +163,8 @@ function buildTieredResponse(colleges, student, data = null) {
       requestedBranch: branch,
       cutoffCategory: resolvedCutoff.categoryUsed || null,
       cutoffBasis: resolvedCutoff.categoryUsed === cat
-        ? 'Live Web-Scraped 2024 Cutoff'
-        : `Live Web-Scraped Cutoff (${resolvedCutoff.categoryUsed} benchmark)`,
+        ? 'Seeded estimate for selected category'
+        : `Seeded estimate; ${resolvedCutoff.categoryUsed} fallback`,
       effectiveCutoff: cutoff,
       cutoffPercentile: cutoff,
       margin: Number(diff.toFixed(1)),
@@ -172,10 +172,10 @@ function buildTieredResponse(colleges, student, data = null) {
       isHomeStateEligible: isHS,
       counsellingBoard: c.counsellingBoard,
       affordability: aff,
-      dataSource: c.extractionMethod || 'Live Web Scraped Data',
-      sourceReferences: c.sourceReferences || data?.collegeReferences?.[c.id] || [],
+      dataSource: 'Seeded estimate; not verified by scraper',
+      sourceReferences: data?.collegeReferences?.[c.id] || [],
       availableBranches: Object.keys(c.cutoffs || {}),
-      dataUpdatedAt: c.scrapedAt || data?.enrichedAt || data?.scrapedAt || new Date().toISOString()
+      dataUpdatedAt: data?.enrichedAt || data?.scrapedAt || null
     };
 
     if (diff >= 3.0) {
@@ -194,11 +194,11 @@ function buildTieredResponse(colleges, student, data = null) {
     tiers: { DREAM, REALISTIC, SAFE },
     student,
     generatedAt: new Date().toISOString(),
-    dataSource: 'Live Web Scraped Data (Official Portals & Knowledge Graph)',
+    dataSource: 'Seeded estimates with scraped source references',
     dataQuality: {
-      valuesVerifiedByScraper: true,
-      scrapedAt: data?.enrichedAt || data?.scrapedAt || new Date().toISOString(),
-      note: 'Dynamically scraped and structured from authoritative higher education web sources.'
+      valuesVerifiedByScraper: false,
+      scrapedAt: data?.enrichedAt || data?.scrapedAt || null,
+      note: data?.dataQualityNote || 'Scraped links are references only and do not verify seeded values.'
     }
   };
 }
@@ -693,30 +693,14 @@ async function getSupabaseUser(req) {
 }
 
 app.use('/api', async (req, res, next) => {
-  const publicPaths = ['/colleges', '/scholarships', '/scrape-colleges', '/affordability', '/alternatives', '/health'];
-  const isPublic = publicPaths.some(p => req.path.startsWith(p));
-
   try {
     const user = await getSupabaseUser(req);
-    if (user?.id) {
-      req.authUser = user;
-      req.student = studentsByUser.get(user.id) || defaultStudent();
-      return next();
-    }
+    if (!user?.id) return res.status(401).json({ error: 'Sign in is required.' });
 
-    if (isPublic) {
-      req.authUser = { id: 'guest-preview' };
-      req.student = defaultStudent();
-      return next();
-    }
-
-    return res.status(401).json({ error: 'Sign in is required.' });
+    req.authUser = user;
+    req.student = studentsByUser.get(user.id) || defaultStudent();
+    return next();
   } catch (error) {
-    if (isPublic) {
-      req.authUser = { id: 'guest-preview' };
-      req.student = defaultStudent();
-      return next();
-    }
     console.error('Could not authorize API request:', error);
     return res.status(error.statusCode || 503).json({ error: error.message || 'Could not verify access.' });
   }
@@ -738,25 +722,6 @@ app.get('/api/colleges', (req, res) => {
   const data = loadEnrichedData();
   const result = buildCollegesFromScraped(data, req.student);
   res.json(result);
-});
-
-// Trigger dynamic web scraping on demand
-app.post('/api/scrape-colleges', async (req, res) => {
-  try {
-    console.log('[ProxyServer] Live web scraping triggered by user request...');
-    const dynamicColleges = await scrapeAndExtractColleges();
-    const data = loadEnrichedData();
-    const result = buildCollegesFromScraped(data, req.student);
-    res.json({
-      success: true,
-      count: dynamicColleges.length,
-      colleges: result,
-      message: `Successfully scraped ${dynamicColleges.length} live colleges from web portals!`
-    });
-  } catch (err) {
-    console.error('[ProxyServer] Live scraping error:', err);
-    res.status(500).json({ error: err.message || 'Scrape failed' });
-  }
 });
 
 // Scholarships (real data from Anakin scrape)
