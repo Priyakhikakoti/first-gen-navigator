@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
+import { scrapeAndExtractColleges } from './gemini-anakin-scraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -49,8 +50,8 @@ function loadEnrichedData() {
 }
 
 function buildCollegesFromScraped(data, student) {
-  const baseColleges = getBaseColleges();
-  return buildTieredResponse(baseColleges, student || defaultStudent(), data);
+  const dynamicColleges = getDynamicColleges();
+  return buildTieredResponse(dynamicColleges, student || defaultStudent(), data);
 }
 
 function defaultStudent() {
@@ -195,9 +196,28 @@ function getApplicableScholarship(student, college) {
   return scholarship;
 }
 
-// ─── Base College Data (enriched with real NIRF ranks & fees) ───────────────
+// ─── Dynamic College Data (Extracted via Gemini AI & Anakin Web Scraping) ────
+
+function getDynamicColleges() {
+  const dynamicPath = path.join(ROOT, 'scraper', 'dynamic-colleges.json');
+  if (fs.existsSync(dynamicPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('[ProxyServer] Error reading dynamic-colleges.json:', e.message);
+    }
+  }
+  return [];
+}
 
 function getBaseColleges() {
+  const dynamic = getDynamicColleges();
+  if (dynamic && dynamic.length > 0) {
+    return dynamic;
+  }
   return [
     {
       id: 'COL-01', name: 'National Institute of Technology (NIT) Jamshedpur', shortCode: 'NIT-JSR',
@@ -711,18 +731,33 @@ app.get('/api/alternatives', (req, res) => {
 
 // ─── In-memory document vault (persists for session) ─────────────────────────
 
+function normalizeDocType(type) {
+  if (!type) return '';
+  const clean = String(type).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (clean.includes('caste') || clean.includes('category') || clean.includes('jati')) return 'caste';
+  if (clean.includes('income') || clean.includes('aay') || clean.includes('salary')) return 'income';
+  if (clean.includes('domicile') || clean.includes('residen') || clean.includes('niwas') || clean.includes('resident')) return 'domicile';
+  if (clean.includes('bank') || clean.includes('passbook') || clean.includes('cheque') || clean.includes('account')) return 'bank';
+  if (clean.includes('aadhaar') || clean.includes('uid')) return 'aadhaar';
+  if (clean.includes('jee') || clean.includes('nta') || clean.includes('scorecard')) return 'jee';
+  if (clean.includes('12') || clean.includes('xii') || clean.includes('senior') || clean.includes('intermediate')) return 'class12';
+  if (clean.includes('10') || clean.includes('matric') || clean.includes('secondary')) return 'class10';
+  return clean;
+}
+
 const documentVault = [
   { id: 'DOC-01', documentType: 'Income Certificate',              fileName: null,                        status: 'Pending',  issuer: 'Tehsildar / SDM Office',         notes: 'Required for all income-based scholarships and EWS/OBC-NCL quota.',    critical: true  },
-  { id: 'DOC-02', documentType: 'Caste / Category Certificate',    fileName: null,                        status: 'Pending',  issuer: 'District Magistrate Office',      notes: 'Mandatory for OBC-NCL / SC / ST / EWS quota seat allocation.',        critical: true  },
-  { id: 'DOC-03', documentType: 'Class 10 Marksheet & Certificate',fileName: 'class10_marksheet.pdf',    status: 'Uploaded', issuer: 'School / CBSE / State Board',     notes: 'Board certificate and marksheet with roll number.', critical: true  },
-  { id: 'DOC-04', documentType: 'Class 12 Marksheet',              fileName: 'class12_marksheet.pdf',    status: 'Uploaded', issuer: 'CBSE / State Board',               notes: 'Original marksheet required at college reporting.', critical: true  },
-  { id: 'DOC-05', documentType: 'JEE Main Scorecard',              fileName: 'jee_main_scorecard.pdf',   status: 'Uploaded', issuer: 'NTA — National Testing Agency',    notes: 'Official scorecard with application number and percentile.', critical: true  },
-  { id: 'DOC-06', documentType: 'Domicile / Residence Certificate',fileName: null,                        status: 'Pending',  issuer: 'SDM / Tehsildar Office',         notes: 'Required for home-state quota at NITs and state colleges.',           critical: true  },
-  { id: 'DOC-07', documentType: 'Bank Passbook (First Page)',       fileName: null,                        status: 'Pending',  issuer: 'Nationalized Bank',              notes: 'For scholarship disbursement — first page with IFSC and account no.', critical: false }
+  { id: 'DOC-02', documentType: 'Caste Certificate',               fileName: null,                        status: 'Pending',  issuer: 'District Magistrate Office',      notes: 'Mandatory for OBC-NCL / SC / ST / EWS quota seat allocation.',        critical: true  },
+  { id: 'DOC-03', documentType: 'Domicile Certificate',            fileName: null,                        status: 'Pending',  issuer: 'SDM / Tehsildar Office',         notes: 'Required for home-state quota at NITs and state colleges.',           critical: true  },
+  { id: 'DOC-04', documentType: 'JEE Scorecard',                   fileName: 'jee_main_scorecard.pdf',   status: 'Uploaded', issuer: 'NTA — National Testing Agency',    notes: 'Official scorecard with application number and percentile.', critical: true  },
+  { id: 'DOC-05', documentType: 'Class 12 Marksheet',              fileName: 'class12_marksheet.pdf',    status: 'Uploaded', issuer: 'CBSE / State Board',               notes: 'Original marksheet required at college reporting.', critical: true  },
+  { id: 'DOC-06', documentType: 'Class 10 Marksheet',              fileName: 'class10_marksheet.pdf',    status: 'Uploaded', issuer: 'School / CBSE / State Board',     notes: 'Board certificate and marksheet with roll number.', critical: true  },
+  { id: 'DOC-07', documentType: 'Aadhaar',                         fileName: 'aadhaar_card_masked.pdf',  status: 'Uploaded', issuer: 'UIDAI — Govt of India',           notes: 'Primary biometric identity record required for NSP and state databases.', critical: true },
+  { id: 'DOC-08', documentType: 'Bank Details',                    fileName: null,                        status: 'Pending',  issuer: 'Nationalized Bank',              notes: 'For scholarship disbursement — first page with IFSC and account no.', critical: false }
 ];
 
 function buildDocumentsResponse() {
-  const uploaded = documentVault.filter(d => d.status === 'Uploaded').length;
+  const uploaded = documentVault.filter(d => d.status === 'Uploaded' || d.status === 'Verified').length;
   const total    = documentVault.length;
   const missing  = total - uploaded;
   return {
@@ -741,27 +776,28 @@ app.get('/api/documents', (req, res) => {
 
 // POST /api/documents — called by confirmDocumentUpload() in app.js
 app.post('/api/documents', (req, res) => {
-  const { documentType, fileName } = req.body || {};
+  const { documentType, fileName, status } = req.body || {};
 
   if (!documentType) {
     return res.status(400).json({ error: 'documentType is required' });
   }
 
-  // Find existing doc by type (case-insensitive) or create a new one
+  // Find existing doc by type (normalized matching) or create a new one
+  const targetNorm = normalizeDocType(documentType);
   const existing = documentVault.find(
-    d => d.documentType.toLowerCase() === documentType.toLowerCase()
+    d => normalizeDocType(d.documentType) === targetNorm || d.documentType.toLowerCase() === documentType.toLowerCase()
   );
 
   if (existing) {
     existing.fileName = fileName || existing.fileName;
-    existing.status   = 'Uploaded';
+    existing.status   = status || 'Uploaded';
   } else {
     // New custom document type
     documentVault.push({
       id:           `DOC-${String(documentVault.length + 1).padStart(2, '0')}`,
       documentType,
       fileName:     fileName || `${documentType.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`,
-      status:       'Uploaded',
+      status:       status || 'Uploaded',
       issuer:       'Self-submitted',
       notes:        'Custom document added via Document Vault.',
       critical:     false
@@ -907,36 +943,83 @@ app.get('/api/translate', (req, res) => {
   res.json({ lang: lang || 'en', message: 'Translation service via Anakin proxy.' });
 });
 
-// ─── Refresh Endpoint — triggers Anakin re-scrape ────────────────────────────
+// ─── Refresh & Dynamic Scraping Endpoints (Gemini + Anakin) ─────────────────
 
 app.post('/api/refresh', async (req, res) => {
-  res.json({ message: 'Scrape triggered. Run: node scraper/anakin-scraper.js', status: 'queued' });
+  try {
+    console.log('[ProxyServer] Live re-scrape triggered via POST /api/refresh...');
+    const stateFilter = req.body?.state || currentStudent?.state || null;
+    const colleges = await scrapeAndExtractColleges(stateFilter);
+    res.json({
+      message: `Dynamic scraping complete! Extracted ${colleges.length} colleges via Gemini & Anakin.`,
+      status: 'completed',
+      collegeCount: colleges.length,
+      extractedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[ProxyServer] Re-scrape error:', err.message);
+    res.status(500).json({ error: 'Dynamic scrape failed: ' + err.message, status: 'failed' });
+  }
+});
+
+app.post('/api/scrape-colleges', async (req, res) => {
+  try {
+    const stateFilter = req.body?.state || req.query?.state || currentStudent?.state || null;
+    console.log(`[ProxyServer] On-demand college scrape for state: ${stateFilter || 'All India'}`);
+    const colleges = await scrapeAndExtractColleges(stateFilter);
+    res.json({
+      success: true,
+      count: colleges.length,
+      colleges,
+      scrapedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[ProxyServer] On-demand scrape error:', err.message);
+    res.status(500).json({ error: 'Dynamic scrape failed: ' + err.message });
+  }
 });
 
 // ─── Scrape Status ────────────────────────────────────────────────────────────
 
 app.get('/api/scrape-status', (req, res) => {
+  const dynamicPath = path.join(ROOT, 'scraper', 'dynamic-colleges.json');
   const enrichedPath = path.join(ROOT, 'scraper', 'enriched-data.json');
   const scrapedPath = path.join(ROOT, 'scraper', 'scraped-data.json');
 
+  const dynamicExists = fs.existsSync(dynamicPath);
   const enrichedExists = fs.existsSync(enrichedPath);
   const scrapedExists = fs.existsSync(scrapedPath);
 
+  let dynamicCount = 0;
+  if (dynamicExists) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+      dynamicCount = Array.isArray(parsed) ? parsed.length : 0;
+    } catch (e) {}
+  }
+
   let lastScraped = null;
   if (enrichedExists) {
-    const data = JSON.parse(fs.readFileSync(enrichedPath, 'utf8'));
-    lastScraped = data.enrichedAt || null;
+    try {
+      const data = JSON.parse(fs.readFileSync(enrichedPath, 'utf8'));
+      lastScraped = data.enrichedAt || null;
+    } catch (e) {}
   } else if (scrapedExists) {
-    const data = JSON.parse(fs.readFileSync(scrapedPath, 'utf8'));
-    lastScraped = data.scrapedAt || null;
+    try {
+      const data = JSON.parse(fs.readFileSync(scrapedPath, 'utf8'));
+      lastScraped = data.scrapedAt || null;
+    } catch (e) {}
   }
 
   res.json({
+    dynamicCollegesAvailable: dynamicExists,
+    dynamicCollegesCount: dynamicCount,
     enrichedDataAvailable: enrichedExists,
     rawDataAvailable: scrapedExists,
     lastScraped,
-    dataSource: enrichedExists ? 'Anakin Enriched' : scrapedExists ? 'Anakin Raw' : 'Base Data Only',
-    apiKeyConfigured: !!process.env.ANAKIN_API_KEY
+    dataSource: dynamicExists ? 'Gemini AI + Anakin Web Scraper' : enrichedExists ? 'Anakin Enriched' : 'Base Data Only',
+    apiKeyConfigured: !!process.env.ANAKIN_API_KEY,
+    geminiKeyConfigured: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
   });
 });
 
