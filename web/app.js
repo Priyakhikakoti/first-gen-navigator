@@ -505,6 +505,7 @@ async function handleAuthSession(user) {
   state.authReady = true;
   if (initializedAuthUserId === user.id) {
     updateAuthUI(user);
+    await loadProgress();
     return;
   }
   state.student = null;
@@ -532,7 +533,7 @@ async function handleAuthSession(user) {
   }
 
   if (window.FGNDB) {
-    syncProfileFromSupabase(user.id).then(() => {
+    await syncProfileFromSupabase(user.id).then(() => {
       if (state.currentUser?.id !== user.id) return;
       if (savedProfile) {
         state.student = savedProfile;
@@ -543,6 +544,7 @@ async function handleAuthSession(user) {
       console.error('Could not load the saved profile:', error);
     });
   }
+  await loadProgress();
 }
 
 // ─── Global Event Listeners ───────────────────────────────────────────────────
@@ -2862,6 +2864,7 @@ async function loadAllData() {
       loadDocuments(),
       loadDeadlines(),
       loadRoadmap(),
+      loadProgress(),
       loadTranslations(state.currentLang)
     ]);
 
@@ -2920,6 +2923,8 @@ function updateAuthUI(user) {
     if (btnSignup) btnSignup.style.display = 'none';
     if (btnSignOut) btnSignOut.style.display = '';
     if (progressPrompt) progressPrompt.style.display = 'none';
+    const progressSubtitle = document.getElementById('progressSubtitle');
+    if (progressSubtitle) progressSubtitle.textContent = 'Track your key milestones. Your progress is saved to your account.';
   } else {
     if (appShell) appShell.hidden = true;
     if (authGate) authGate.hidden = false;
@@ -2929,6 +2934,8 @@ function updateAuthUI(user) {
     if (btnSignup) btnSignup.style.display = '';
     if (btnSignOut) btnSignOut.style.display = 'none';
     if (progressPrompt) progressPrompt.style.display = '';
+    const progressSubtitle = document.getElementById('progressSubtitle');
+    if (progressSubtitle) progressSubtitle.textContent = 'Track your key milestones. Sign in to save progress across devices.';
     document.querySelectorAll('[data-analysis-required]').forEach(element => {
       element.hidden = true;
     });
@@ -3108,8 +3115,8 @@ async function loadProgress() {
   if (!container) return;
 
   const DEFAULT_STEPS = [
-    { step: 1, stepId: 'RESULTS', title: 'JEE Main Results & Score Analysis', description: 'Review official scorecard from NTA portal.', month: 'Apr 2026', completed: true },
-    { step: 2, stepId: 'DOCS', title: 'Category & Income Document Verification', description: 'Obtain and OCR-verify Tehsildar certificates.', month: 'May 2026', completed: true },
+    { step: 1, stepId: 'RESULTS', title: 'JEE Main Results & Score Analysis', description: 'Review official scorecard from NTA portal.', month: 'Apr 2026', completed: false },
+    { step: 2, stepId: 'DOCS', title: 'Category & Income Document Verification', description: 'Obtain and OCR-verify Tehsildar certificates.', month: 'May 2026', completed: false },
     { step: 3, stepId: 'JOSAA', title: 'JoSAA Choice Filling — Rounds 1–6', description: 'Fill choices on josaa.admissions.nic.in.', month: 'Jun 2026', completed: false },
     { step: 4, stepId: 'CSAB', title: 'CSAB Special Vacant Round Participation', description: 'Target vacant seats on csab.nic.in.', month: 'Aug 2026', completed: false },
     { step: 5, stepId: 'SCHOLARSHIP', title: 'Apply for NSP / e-Kalyan Scholarship', description: 'Submit portal applications.', month: 'Sep 2026', completed: false },
@@ -3117,13 +3124,33 @@ async function loadProgress() {
   ];
 
   let steps = DEFAULT_STEPS.map(s => ({ ...s }));
-  if (state.currentUser && window.FGNDB) {
-    const { data } = await window.FGNDB.getProgress(state.currentUser.id);
-    if (data && data.length > 0) {
-      const map = {};
-      data.forEach(r => { map[r.step_id] = r.completed; });
-      steps = steps.map(s => ({ ...s, completed: map[s.stepId] !== undefined ? map[s.stepId] : s.completed }));
+  const userId = state.currentUser?.id;
+  const localKey = userId ? `fgn-admission-progress:${userId}` : null;
+  let localProgress = {};
+  if (localKey) {
+    try { localProgress = JSON.parse(localStorage.getItem(localKey) || '{}') || {}; } catch {}
+  }
+  steps = steps.map(step => ({ ...step, completed: localProgress[step.stepId] ?? step.completed }));
+
+  if (userId && window.FGNDB) {
+    try {
+      const { data, error } = await window.FGNDB.getProgress(userId);
+      if (error) throw error;
+      const cloudMap = Object.fromEntries((data || []).map(row => [row.step_id, Boolean(row.completed)]));
+      steps = steps.map(step => ({ ...step, completed: cloudMap[step.stepId] ?? step.completed }));
+
+      const missingFromCloud = steps.filter(step => localProgress[step.stepId] !== undefined && cloudMap[step.stepId] === undefined);
+      const migrated = await Promise.all(missingFromCloud.map(step => window.FGNDB.updateProgress(userId, step.stepId, Boolean(localProgress[step.stepId]), step.step)));
+      const migrationError = migrated.find(result => result?.error)?.error;
+      if (migrationError) throw migrationError;
+      localStorage.setItem(localKey, JSON.stringify(Object.fromEntries(steps.map(step => [step.stepId, step.completed]))));
+      setProgressSaveStatus('Progress saved to your account.', 'success');
+    } catch (error) {
+      console.error('Could not load or sync admission progress:', error);
+      setProgressSaveStatus('Cloud sync is unavailable. Your progress is saved on this device.', 'local');
     }
+  } else if (userId) {
+    setProgressSaveStatus('Cloud sync is unavailable. Your progress is saved on this device.', 'local');
   }
 
   container.innerHTML = '';
@@ -3145,13 +3172,35 @@ async function loadProgress() {
         return;
       }
       step.completed = !step.completed;
+      if (localKey) {
+        localProgress[step.stepId] = step.completed;
+        try { localStorage.setItem(localKey, JSON.stringify(localProgress)); } catch (error) {
+          console.warn('Could not save progress on this device:', error);
+        }
+      }
       if (window.FGNDB) {
-        await window.FGNDB.updateProgress(state.currentUser.id, step.stepId, step.completed);
+        try {
+          const { error } = await window.FGNDB.updateProgress(state.currentUser.id, step.stepId, step.completed, step.step);
+          if (error) throw error;
+          setProgressSaveStatus('Progress saved to your account.', 'success');
+        } catch (error) {
+          console.error('Could not sync admission progress:', error);
+          setProgressSaveStatus('Saved on this device. Cloud sync failed; check Supabase admission_progress setup.', 'local');
+        }
+      } else {
+        setProgressSaveStatus('Saved on this device. Cloud sync is unavailable.', 'local');
       }
       await loadProgress();
     });
     container.appendChild(card);
   });
+}
+
+function setProgressSaveStatus(message, status = '') {
+  const element = document.getElementById('progressSaveStatus');
+  if (!element) return;
+  element.textContent = message;
+  element.dataset.status = status;
 }
 
 async function syncProfileFromSupabase(userId = state.currentUser?.id) {

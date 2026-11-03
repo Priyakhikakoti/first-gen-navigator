@@ -2182,6 +2182,9 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--color-indigo);
   color: white;
 }
+.progress-save-status { min-height: 1.25rem; margin: 0.35rem 0 0; font-size: 0.82rem; color: var(--color-slate-500); }
+.progress-save-status[data-status="success"] { color: var(--color-emerald); }
+.progress-save-status[data-status="local"] { color: var(--color-saffron); }
 .step-info { flex: 1; }
 .step-card-title { font-weight: 700; font-size: 0.9rem; color: var(--color-navy-dark); margin-bottom: 0.2rem; }
 .step-card-desc { font-size: 0.8rem; color: var(--color-slate-500); }

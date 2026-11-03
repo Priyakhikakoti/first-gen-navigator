@@ -63,9 +63,9 @@ async function dbUpsertDocument(userId, documentType, fileName) {
 async function dbGetProgress(userId) {
   return await _supabase.from('admission_progress').select('*').eq('user_id', userId).order('step_order', { ascending: true });
 }
-async function dbUpdateProgress(userId, stepId, completed) {
+async function dbUpdateProgress(userId, stepId, completed, stepOrder) {
   return await _supabase.from('admission_progress').upsert({
-    user_id: userId, step_id: stepId, completed, updated_at: new Date().toISOString()
+    user_id: userId, step_id: stepId, step_order: stepOrder, completed, updated_at: new Date().toISOString()
   }, { onConflict: 'user_id,step_id' }).select().single();
 }
 

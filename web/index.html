@@ -592,7 +592,8 @@
         <div>
           <div class="section-badge">My Progress</div>
           <h2 class="section-title">Admission Progress Dashboard</h2>
-          <p class="section-subtitle">Track your key milestones. Sign in to save progress across devices.</p>
+          <p class="section-subtitle" id="progressSubtitle">Track your key milestones. Sign in to save progress across devices.</p>
+          <p class="progress-save-status" id="progressSaveStatus" role="status" aria-live="polite"></p>
         </div>
         <div id="progressLoginPrompt" class="progress-login-cta" style="display:none;">
           <button class="btn-primary" onclick="openAuthGate();">Sign In to Save Progress</button>
@@ -835,6 +836,6 @@
   </main>
 
   <script src="supabase-client.js"></script>
-  <script src="app.js?v=20261103a"></script>
+  <script src="app.js?v=20261103b"></script>
 </body>
 </html>
