@@ -307,8 +307,9 @@ public class FirstGenNavigatorServer {
                 Map<String, String> map = SimpleJson.parseSimpleJsonMap(body);
                 String docType = map.getOrDefault("documentType", "Aadhaar");
                 String fileName = map.getOrDefault("fileName", docType.toLowerCase().replace(" ", "_") + ".pdf");
+                String status = map.getOrDefault("status", "UPLOADED");
 
-                documentManager.addOrUpdateDocument(docs, student.getId(), docType, fileName);
+                documentManager.addOrUpdateDocument(docs, student.getId(), docType, fileName, status);
                 sendResponse(exchange, 200, "{\"success\":true,\"message\":\"Document uploaded successfully\"}", "application/json");
                 return;
             }
@@ -316,7 +317,7 @@ public class FirstGenNavigatorServer {
             // Return document list and readiness summary
             int uploadedCount = 0;
             for (DocumentRecord d : docs) {
-                if ("UPLOADED".equalsIgnoreCase(d.getStatus())) uploadedCount++;
+                if ("UPLOADED".equalsIgnoreCase(d.getStatus()) || "VERIFIED".equalsIgnoreCase(d.getStatus())) uploadedCount++;
             }
 
             StringBuilder json = new StringBuilder();

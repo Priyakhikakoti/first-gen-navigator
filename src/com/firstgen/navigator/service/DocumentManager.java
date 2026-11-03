@@ -69,7 +69,7 @@ public class DocumentManager {
         Map<String, DocumentRecord> uploadedMap = new HashMap<>();
         if (studentDocs != null) {
             for (DocumentRecord doc : studentDocs) {
-                if ("UPLOADED".equalsIgnoreCase(doc.getStatus())) {
+                if ("UPLOADED".equalsIgnoreCase(doc.getStatus()) || "VERIFIED".equalsIgnoreCase(doc.getStatus())) {
                     uploadedMap.put(doc.getDocumentType().toLowerCase(), doc);
                 }
             }
@@ -100,15 +100,22 @@ public class DocumentManager {
 
     public List<DocumentRecord> addOrUpdateDocument(List<DocumentRecord> docList, String studentId, 
                                                     String docType, String fileName) {
+        return addOrUpdateDocument(docList, studentId, docType, fileName, "UPLOADED");
+    }
+
+    public List<DocumentRecord> addOrUpdateDocument(List<DocumentRecord> docList, String studentId, 
+                                                    String docType, String fileName, String status) {
         if (docList == null) {
             docList = new ArrayList<>();
         }
+
+        String finalStatus = (status != null && !status.trim().isEmpty()) ? status.toUpperCase() : "UPLOADED";
 
         boolean found = false;
         for (DocumentRecord doc : docList) {
             if (doc.getDocumentType().equalsIgnoreCase(docType)) {
                 doc.setFileName(fileName);
-                doc.setStatus("UPLOADED");
+                doc.setStatus(finalStatus);
                 doc.setUploadDate(java.time.LocalDate.now().toString());
                 doc.setVerifiedNotes("Uploaded via First Gen Portal");
                 found = true;
@@ -123,7 +130,7 @@ public class DocumentManager {
                     docType,
                     fileName,
                     java.time.LocalDate.now().toString(),
-                    "UPLOADED",
+                    finalStatus,
                     "Uploaded via First Gen Portal"
             );
             docList.add(newDoc);
