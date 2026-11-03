@@ -139,13 +139,70 @@
           </div>
 
           <div class="form-group">
-            <label for="inputPercentile">JEE Main Percentile (0 – 100)</label>
+            <label for="inputExam">Entrance Exam</label>
+            <select id="inputExam" required>
+              <option value="JEE_MAIN">JEE Main</option>
+              <option value="JEE_ADVANCED">JEE Advanced</option>
+              <option value="NEET_UG">NEET UG</option>
+              <option value="CUET_UG">CUET UG</option>
+              <option value="CLAT">CLAT</option>
+              <option value="AILET">AILET</option>
+              <option value="BITSAT">BITSAT</option>
+              <option value="VITEEE">VITEEE</option>
+              <option value="MHT_CET">MHT CET</option>
+              <option value="KCET">KCET</option>
+              <option value="WBJEE">WBJEE</option>
+              <option value="KEAM">KEAM</option>
+              <option value="COMEDK">COMEDK UGET</option>
+              <option value="AP_EAPCET">AP EAPCET</option>
+              <option value="TS_EAPCET">TS EAPCET</option>
+              <option value="GUJCET">GUJCET</option>
+              <option value="OJEE">OJEE</option>
+              <option value="ASSAM_CEE">Assam CEE</option>
+              <option value="MET">Manipal MET</option>
+              <option value="SRMJEEE">SRMJEEE</option>
+              <option value="KIITEE">KIITEE</option>
+              <option value="NATA">NATA</option>
+              <option value="NIFT">NIFT Entrance</option>
+              <option value="UCEED">UCEED</option>
+              <option value="IPMAT">IPMAT</option>
+              <option value="NDA">NDA</option>
+              <option value="GATE">GATE</option>
+              <option value="OTHER">Other exam</option>
+            </select>
+          </div>
+          <div class="form-group" id="otherExamGroup" hidden>
+            <label for="inputOtherExam">Exam name</label>
+            <input type="text" id="inputOtherExam" maxlength="80" placeholder="Enter exam name" />
+          </div>
+          <div class="form-group">
+            <label for="inputStudyArea">Course area</label>
+            <select id="inputStudyArea" required>
+              <option value="engineering">Engineering & technology</option>
+              <option value="medical">Medical, dental & allied health</option>
+              <option value="university undergraduate">University undergraduate courses</option>
+              <option value="law">Law</option>
+              <option value="architecture">Architecture</option>
+              <option value="design">Design & fashion</option>
+              <option value="management">Management</option>
+              <option value="defence">Defence</option>
+              <option value="postgraduate">Postgraduate programs</option>
+              <option value="other">Other courses</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="inputPercentile" id="examScoreLabel">JEE Main Percentile (0–100)</label>
             <div class="input-with-display">
               <input type="number" id="inputPercentile" min="0" max="100" step="0.1" required />
-              <span class="input-suffix">%ile</span>
+              <span class="input-suffix" id="examScoreSuffix">%ile</span>
             </div>
+            <small class="field-hint" id="examScoreHint">Enter your JEE Main percentile.</small>
           </div>
-
+          <div class="form-group" id="neetRankGroup" hidden>
+            <label for="inputNeetRank">NEET All India Rank (AIR)</label>
+            <input type="number" id="inputNeetRank" min="1" step="1" placeholder="Optional, from your NEET scorecard" />
+            <small class="field-hint">AIR will be used with course, quota, and category once a verified MCC cutoff dataset is connected. Marks alone are not a reliable rank conversion.</small>
+          </div>
           <div class="form-group">
             <label for="inputCategory">Reservation Category</label>
             <select id="inputCategory" required>
@@ -170,7 +227,7 @@
             </select>
           </div>
 
-          <div class="form-group">
+          <div class="form-group" id="preferredBranchGroup">
             <label for="inputBranch">Preferred Engineering Branch</label>
             <select id="inputBranch" required>
               <option value="CSE">Computer Science & Engineering (CSE)</option>
@@ -229,10 +286,19 @@
         <div>
           <div class="section-badge">Step 2</div>
           <h2 class="section-title">Institutional Matches</h2>
-          <p class="section-subtitle" id="collegesSubtext">Compare your profile with the local estimates, review affordability, and follow source links. Current cutoffs and fees are not yet verified against official data.</p>
+          <p class="section-subtitle" id="collegesSubtext">Compare your selected entrance exam and course preferences with college admissions information.</p>
         </div>
+        <label class="college-scope-control" for="collegeSearchScope">Search area
+          <select id="collegeSearchScope">
+            <option value="all-india" selected>All India</option>
+            <option value="home-state">Home state only</option>
+          </select>
+        </label>
         <!-- Tier Navigation Tabs -->
         <div class="tier-tabs">
+          <button class="tier-tab" data-tier="all" id="tabAll">
+            All Matches <span class="tab-count" id="countAll">0</span>
+          </button>
           <button class="tier-tab active" data-tier="realistic" id="tabRealistic">
             Realistic Target <span class="tab-count" id="countRealistic">0</span>
           </button>
@@ -346,7 +412,7 @@
       <div class="section-header">
         <div class="section-badge">Step 5</div>
         <h2 class="section-title">Strategic Alternative Pathways</h2>
-        <p class="section-subtitle">If top-choice branches have stringent cutoffs, these pathways optimize branch-versus-college trade-offs.</p>
+        <p class="section-subtitle">Compare preferred and alternative branches against your profile. Costs exclude scholarships until eligibility is confirmed.</p>
       </div>
 
       <div class="pathways-diagnostic-box" id="pathwaysDiagnostic">
@@ -768,6 +834,6 @@
   </main>
 
   <script src="supabase-client.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20261103a"></script>
 </body>
 </html>

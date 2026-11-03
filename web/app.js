@@ -17,6 +17,76 @@
 const API_BASE = '';
 let initializedAuthUserId = null;
 
+const EXAM_SCORE_CONFIG = {
+  JEE_MAIN: { label: 'JEE Main Percentile (0–100)', unit: '%ile', hint: 'Enter your JEE Main percentile.', max: 100, step: 0.01, area: 'engineering' },
+  JEE_ADVANCED: { label: 'JEE Advanced All India Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  NEET_UG: { label: 'NEET UG Marks (0–720)', unit: '/ 720', hint: 'Enter your total marks out of 720.', max: 720, step: 1, area: 'medical' },
+  CUET_UG: { label: 'CUET UG Normalized Score', unit: 'score', hint: 'Enter a score for your selected subject combination. Cutoffs vary by university and course.', step: 0.1, area: 'university undergraduate' },
+  CLAT: { label: 'CLAT All India Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'law' },
+  AILET: { label: 'AILET All India Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'law' },
+  BITSAT: { label: 'BITSAT Score', unit: 'score', hint: 'Enter your total BITSAT score.', step: 1, area: 'engineering' },
+  VITEEE: { label: 'VITEEE Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  MHT_CET: { label: 'MHT CET Percentile (0–100)', unit: '%ile', hint: 'Enter your MHT CET percentile.', max: 100, step: 0.01, area: 'engineering' },
+  KCET: { label: 'KCET Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  WBJEE: { label: 'WBJEE Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  KEAM: { label: 'KEAM Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  COMEDK: { label: 'COMEDK UGET Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  AP_EAPCET: { label: 'AP EAPCET Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  TS_EAPCET: { label: 'TS EAPCET Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  GUJCET: { label: 'GUJCET Score', unit: 'score', hint: 'Enter your exam score.', step: 1, area: 'engineering' },
+  OJEE: { label: 'OJEE Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  ASSAM_CEE: { label: 'Assam CEE Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  MET: { label: 'Manipal MET Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  SRMJEEE: { label: 'SRMJEEE Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  KIITEE: { label: 'KIITEE Rank', unit: 'rank', hint: 'Enter your rank; a smaller rank is better.', min: 1, step: 1, area: 'engineering' },
+  NATA: { label: 'NATA Score', unit: 'score', hint: 'Enter your NATA score.', step: 0.1, area: 'architecture' },
+  NIFT: { label: 'NIFT Entrance Score or Rank', unit: 'score / rank', hint: 'Enter the score or rank shown on your result.', step: 1, area: 'design' },
+  UCEED: { label: 'UCEED Score or Rank', unit: 'score / rank', hint: 'Enter the score or rank shown on your result.', step: 1, area: 'design' },
+  IPMAT: { label: 'IPMAT Score', unit: 'score', hint: 'Enter your total score.', step: 0.1, area: 'management' },
+  NDA: { label: 'NDA Written Exam Score', unit: 'score', hint: 'Enter your written exam score.', step: 1, area: 'defence' },
+  GATE: { label: 'GATE Score or Rank', unit: 'score / rank', hint: 'Enter your score or rank.', step: 0.1, area: 'postgraduate' },
+  OTHER: { label: 'Exam Score or Rank', unit: 'score / rank', hint: 'Enter the score or rank shown on your result.', step: 0.1, area: 'other' }
+};
+
+function updateExamScoreFields(resetScore = false) {
+  const exam = document.getElementById('inputExam')?.value || 'JEE_MAIN';
+  const config = EXAM_SCORE_CONFIG[exam] || EXAM_SCORE_CONFIG.OTHER;
+  const scoreInput = document.getElementById('inputPercentile');
+  const label = document.getElementById('examScoreLabel');
+  const suffix = document.getElementById('examScoreSuffix');
+  const hint = document.getElementById('examScoreHint');
+  const otherGroup = document.getElementById('otherExamGroup');
+  const otherInput = document.getElementById('inputOtherExam');
+  const area = document.getElementById('inputStudyArea');
+  const branchGroup = document.getElementById('preferredBranchGroup');
+  const collegesSubtext = document.getElementById('collegesSubtext');
+  const neetRankGroup = document.getElementById('neetRankGroup');
+  if (label) label.textContent = config.label;
+  if (suffix) suffix.textContent = config.unit;
+  if (hint) hint.textContent = config.hint;
+  if (scoreInput) {
+    scoreInput.min = config.min ?? 0;
+    if (config.max !== undefined) scoreInput.max = config.max;
+    else scoreInput.removeAttribute('max');
+    scoreInput.step = config.step;
+    scoreInput.placeholder = config.max ? `0–${config.max}` : 'Enter score or rank';
+    if (resetScore) scoreInput.value = '';
+  }
+  const isOther = exam === 'OTHER';
+  if (neetRankGroup) neetRankGroup.hidden = exam !== 'NEET_UG';
+  if (otherGroup) otherGroup.hidden = !isOther;
+  if (otherInput) otherInput.required = isOther;
+  if (area && resetScore && config.area) area.value = config.area;
+  if (branchGroup && area) branchGroup.hidden = area.value !== 'engineering';
+  if (collegesSubtext) {
+    collegesSubtext.textContent = exam === 'JEE_MAIN'
+      ? 'Compare your JEE Main percentile with local cutoff estimates. Verify current ranks, fees, and eligibility with official counselling sources.'
+      : exam === 'NEET_UG'
+        ? 'NEET college discovery is available. MCC rank-based comparisons require your AIR and a verified college cutoff dataset.'
+      : 'Admissions leads are discovered for your selected exam and course area. The app does not yet verify exam-specific cutoff eligibility.';
+  }
+}
+
 // ─── Global State ─────────────────────────────────────────────────────────────
 const state = {
   student: null,
@@ -48,6 +118,7 @@ async function apiFetch(url, options = {}) {
 
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
+  if (window.FGNAuth.apiKey) headers.set('apikey', window.FGNAuth.apiKey);
   return fetch(url, { ...options, headers });
 }
 
@@ -399,9 +470,13 @@ async function handleAuthSession(user) {
   initializedAuthUserId = user.id;
   updateAuthUI(user);
 
-  const savedProfile = getSavedPendingProfile(user.id);
+  const savedProfile = getSavedPendingProfile(user.id) || getLocalSavedProfile(user.id);
   const emptyProfile = {
     name: user.user_metadata?.full_name || '',
+    entranceExam: 'JEE_MAIN',
+    examScore: '',
+    otherExamName: '',
+    studyArea: 'engineering',
     jeePercentile: '',
     category: 'OBC-NCL',
     state: 'Jharkhand',
@@ -431,6 +506,18 @@ async function handleAuthSession(user) {
 
 // ─── Global Event Listeners ───────────────────────────────────────────────────
 function setupEventListeners() {
+  const examSelect = document.getElementById('inputExam');
+  if (examSelect) {
+    examSelect.addEventListener('change', () => updateExamScoreFields(true));
+    updateExamScoreFields();
+  }
+  document.getElementById('inputStudyArea')?.addEventListener('change', () => updateExamScoreFields(false));
+
+  const collegeScopeSelect = document.getElementById('collegeSearchScope');
+  if (collegeScopeSelect) {
+    collegeScopeSelect.addEventListener('change', () => loadColleges());
+  }
+
   // Navigation & Refresh
   const btnRefresh = document.getElementById('btnQuickRecalc');
   if (btnRefresh) {
@@ -468,6 +555,29 @@ function setupEventListeners() {
     btnRecheck.addEventListener('click', () => {
       runApplicationErrorChecks();
       showToast('Profile and compliance rules re-evaluated.');
+    });
+  }
+
+
+  // Live Web Scrape Button
+  const btnLiveScrape = document.getElementById('btnLiveScrape');
+  if (btnLiveScrape) {
+    btnLiveScrape.addEventListener('click', async () => {
+      btnLiveScrape.disabled = true;
+      btnLiveScrape.innerHTML = '<span>⏳ Scraping web via Anakin...</span>';
+      try {
+        const res = await apiFetch(`${API_BASE}/api/scrape`, { method: 'POST' });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Live scrape failed');
+        showToast(`Anakin Web Scrape Complete! Cataloged ${result.totalColleges} colleges across ${result.scrapedWebPagesCount} live web sources.`);
+        await loadColleges();
+      } catch (err) {
+        console.error('Live scrape failed:', err);
+        showToast(err.message || 'Scrape failed. Check connection.');
+      } finally {
+        btnLiveScrape.disabled = false;
+        btnLiveScrape.innerHTML = '<span>⚡ Live Web Scrape (Anakin)</span>';
+      }
     });
   }
 
@@ -1665,31 +1775,74 @@ function renderCompareMatrix() {
 // ─── College Matching Engine ──────────────────────────────────────────────────
 async function loadColleges() {
   try {
-    const res = await apiFetch(`${API_BASE}/api/colleges`);
-    if (!res.ok) return;
+    const scope = document.getElementById('collegeSearchScope')?.value || 'all-india';
+    const res = await apiFetch(`${API_BASE}/api/colleges?scope=${encodeURIComponent(scope)}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || 'Could not load live college results.');
+    }
     state.collegeData = await res.json();
 
     const tiers = state.collegeData.tiers || {};
     const dCount = (tiers.DREAM || tiers.dream || []).length;
     const rCount = (tiers.REALISTIC || tiers.realistic || []).length;
     const sCount = (tiers.SAFE || tiers.safe || []).length;
+    const allCount = dCount + rCount + sCount;
+    const isAdmissionsLeadSearch = state.collegeData.dataSource === 'Exam-specific admissions source discovery';
+    const tabAll = document.getElementById('tabAll');
+    const tabRealistic = document.getElementById('tabRealistic');
+    const tabDream = document.getElementById('tabDream');
+    const tabSafe = document.getElementById('tabSafe');
+    if (tabAll?.firstChild) tabAll.firstChild.textContent = isAdmissionsLeadSearch ? 'All Leads ' : 'All Matches ';
+    if (tabRealistic?.firstChild) tabRealistic.firstChild.textContent = isAdmissionsLeadSearch ? 'Admissions Leads ' : 'Realistic Target ';
+    if (tabDream) tabDream.hidden = isAdmissionsLeadSearch;
+    if (tabSafe) tabSafe.hidden = isAdmissionsLeadSearch;
 
+    const countAll = document.getElementById('countAll');
     const countD = document.getElementById('countDream');
     const countR = document.getElementById('countRealistic');
     const countS = document.getElementById('countSafe');
 
+    if (countAll) countAll.textContent = allCount;
     if (countD) countD.textContent = dCount;
     if (countR) countR.textContent = rCount;
     if (countS) countS.textContent = sCount;
 
     const statCount = document.getElementById('statCollegesCount');
-    if (statCount) statCount.textContent = dCount + rCount + sCount;
+    if (statCount) statCount.textContent = allCount;
 
+    const scrapeBadge = document.getElementById('scrapeStatusBadge');
+    if (scrapeBadge && state.collegeData?.dataQuality?.scrapedAt) {
+      const d = new Date(state.collegeData.dataQuality.scrapedAt);
+      scrapeBadge.textContent = `⚡ Live Scraped (${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+      scrapeBadge.title = `Live scraped at ${d.toLocaleString()} via Anakin Web Scraping Engine`;
+    }
+
+    // Smart tier selection: if currently selected tier is empty, switch to one with results or ALL
+    const currentCount = state.currentTier === 'ALL'
+      ? allCount
+      : (tiers[state.currentTier] || tiers[state.currentTier?.toLowerCase()] || []).length;
+
+    if (currentCount === 0 && allCount > 0) {
+      if (rCount > 0) state.currentTier = 'REALISTIC';
+      else if (sCount > 0) state.currentTier = 'SAFE';
+      else state.currentTier = 'ALL';
+
+      document.querySelectorAll('.tier-tab').forEach(tab => {
+        tab.classList.toggle('active', (tab.dataset.tier || '').toUpperCase() === state.currentTier);
+      });
+      updateTierTip();
+    }
+
+    updateTierTip();
     populateCalculatorDropdown();
     updateRankSummaryBanner();
     renderColleges();
   } catch (e) {
     console.error('Failed to load colleges:', e);
+    state.collegeData = null;
+    const container = document.getElementById('collegeCardsGrid');
+    if (container) container.innerHTML = `<div class="empty-state" style="padding: 2rem; text-align: center; color: var(--color-slate-500); grid-column: 1 / -1;">${escapeHtml(e.message || 'Could not load live college results.')}</div>`;
   }
 }
 
@@ -1717,10 +1870,22 @@ function renderColleges() {
 
   const tiers = state.collegeData.tiers;
   const tierKey = state.currentTier;
-  const list = tiers[tierKey] || tiers[tierKey.toLowerCase()] || [];
+  let list = [];
+  if (tierKey === 'ALL') {
+    list = [
+      ...(tiers.REALISTIC || tiers.realistic || []),
+      ...(tiers.SAFE || tiers.safe || []),
+      ...(tiers.DREAM || tiers.dream || [])
+    ];
+  } else {
+    list = tiers[tierKey] || tiers[tierKey.toLowerCase()] || [];
+  }
 
   if (list.length === 0) {
-    container.innerHTML = `<div class="empty-state" style="padding: 2rem; text-align: center; color: var(--color-slate-500); grid-column: 1 / -1;">No institutions in this tier currently matched with your score. Try adjusting your preferred branch or percentile score.</div>`;
+    const message = state.collegeData.dataSource === 'Exam-specific admissions source discovery'
+      ? 'No clearly named institutions were found in the search results. Try All India search, adjust the course area, or check the exam selection.'
+      : 'No institutions in this tier currently matched with your score. Try adjusting your preferred branch or percentile score.';
+    container.innerHTML = `<div class="empty-state" style="padding: 2rem; text-align: center; color: var(--color-slate-500); grid-column: 1 / -1;">${escapeHtml(message)}</div>`;
     return;
   }
 
@@ -1731,25 +1896,27 @@ function renderColleges() {
     const collegeId = c.id || c.collegeId;
     const collegeName = c.name || c.collegeName;
     const collegeType = c.type || c.instituteType || 'Institute';
+    const isSourceLead = c.matchType === 'source-lead';
     const nirf = c.nirfRank || null;
     const branch = c.branch || 'CSE';
-    const cutoff = c.effectiveCutoff ?? c.cutoffPercentile;
+    const cutoff = Number(c.effectiveCutoff ?? c.cutoffPercentile);
+    const hasCutoff = Number.isFinite(cutoff);
     const isHs = c.isHomeState || c.isHomeStateEligible;
     const board = c.counsellingBoard || 'JoSAA / State';
 
     const aff = c.affordability || {};
-    const tuition = aff.annualTuition || 0;
-    const hostel = aff.annualHostel || 0;
-    const scholarship = aff.applicableScholarship || 0;
-    const netCost = aff.estimatedNetCost !== undefined ? aff.estimatedNetCost : (tuition + hostel - scholarship);
-    const tierName = aff.affordabilityTier || 'Affordable';
+    const tuition = Number.isFinite(aff.annualTuition) ? aff.annualTuition : null;
+    const hostel = Number.isFinite(aff.annualHostel) ? aff.annualHostel : null;
+    const scholarship = Number.isFinite(aff.applicableScholarship) ? aff.applicableScholarship : null;
+    const netCost = Number.isFinite(aff.estimatedNetCost) ? aff.estimatedNetCost : null;
+    const tierName = aff.affordabilityTier || 'Verify costs';
 
     const hsBadge = isHs ? `<span class="badge-home-state">Home State Match</span>` : '';
 
     const studentPct = state.student ? Number(state.student.jeePercentile) : 92;
-    const diff = (studentPct - cutoff).toFixed(1);
-    const diffSign = diff >= 0 ? `+${diff}` : `${diff}`;
-    const diffColor = diff >= 0 ? 'var(--color-emerald)' : 'var(--color-rose)';
+    const diff = hasCutoff ? (studentPct - cutoff).toFixed(1) : null;
+    const diffSign = hasCutoff ? (diff >= 0 ? `+${diff}` : `${diff}`) : '';
+    const diffColor = hasCutoff && diff >= 0 ? 'var(--color-emerald)' : 'var(--color-rose)';
 
     let badgeClass = 'tier-affordable';
     if (tierName.includes('Highly')) badgeClass = 'tier-highly-affordable';
@@ -1769,7 +1936,7 @@ function renderColleges() {
         `<li><a href="${escapeHtml(reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(reference.title || reference.url)}</a></li>`
       ).join('')}</ul>`
       : '<p class="college-source-empty">No college-specific source links were found in the latest scrape.</p>';
-    const rankMarkup = nirf ? `<span>Seeded NIRF rank #${nirf}</span>` : '<span>NIRF rank unavailable</span>';
+    const rankMarkup = nirf ? `<span>NIRF rank #${nirf}</span>` : `<span>${isSourceLead ? 'Admissions page lead' : 'Live web result'}</span>`;
     const categoryBasis = c.cutoffCategory || 'unavailable';
     const fallbackNotice = c.requestedBranch && c.requestedBranch !== branch
       ? `Preferred branch ${escapeHtml(c.requestedBranch)} is not listed; showing ${escapeHtml(branch)} instead.`
@@ -1778,8 +1945,9 @@ function renderColleges() {
     card.innerHTML = `
       <div class="card-top">
         <div class="card-badges-row">
-          <div>
-            <span class="badge-institute-type">${collegeType}</span>
+          <div style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;">
+            <span class="badge-institute-type">${escapeHtml(collegeType)}</span>
+            <span class="badge-tier-${isSourceLead ? 'realistic' : (c.tier || 'realistic').toLowerCase()}">${isSourceLead ? 'COLLEGE LEAD' : escapeHtml(c.tier || 'Match')}</span>
           </div>
           ${hsBadge}
         </div>
@@ -1793,40 +1961,34 @@ function renderColleges() {
 
       <div class="card-cutoff-block">
         <div class="cutoff-comparison">
-          <span>Seeded estimate for <strong>${escapeHtml(branch)}</strong> / ${escapeHtml(categoryBasis)}:</span>
-          <span class="cutoff-num">${cutoff.toFixed(1)}%ile</span>
+          <span>${hasCutoff ? `Cutoff estimate for <strong>${escapeHtml(branch)}</strong> / ${escapeHtml(categoryBasis)}:` : (isSourceLead ? 'Verify this admissions source' : 'Live result matched to your profile')}</span>
+          <span class="cutoff-num">${hasCutoff ? `${cutoff.toFixed(1)}%ile` : 'Open source'}</span>
         </div>
-        <div class="cutoff-advantage-text">${escapeHtml(c.cutoffBasis || 'Cutoff basis unavailable')}</div>
-        <div class="cutoff-bar-bg">
-          <div class="cutoff-bar-fill" style="width: ${Math.min(cutoff, 100)}%; background: ${diffColor};"></div>
-        </div>
-        <div class="cutoff-advantage-text">
-          Your score: <strong>${studentPct.toFixed(1)}%ile</strong> 
-          (<span style="color: ${diffColor}; font-weight: 700;">${diffSign}%ile vs. estimate</span>)
-        </div>
+        <div class="cutoff-advantage-text">${escapeHtml(c.cutoffBasis || c.matchStatus || 'Check the linked admission page for current eligibility.')}</div>
+        ${hasCutoff ? `<div class="cutoff-bar-bg"><div class="cutoff-bar-fill" style="width: ${Math.min(cutoff, 100)}%; background: ${diffColor};"></div></div><div class="cutoff-advantage-text">Your score: <strong>${studentPct.toFixed(1)}%ile</strong> (<span style="color: ${diffColor}; font-weight: 700;">${diffSign}%ile vs. estimate</span>)</div>` : ''}
       </div>
 
-      <div class="card-fee-matrix">
+      ${isSourceLead ? '' : `<div class="card-fee-matrix">
         <div class="fee-col-item">
           <span class="fee-col-label">Annual Tuition</span>
-          <span class="fee-col-val">${formatINR(tuition)}</span>
+          <span class="fee-col-val">${tuition === null ? 'Check source' : formatINR(tuition)}</span>
         </div>
         <div class="fee-col-item">
           <span class="fee-col-label">Hostel & Living</span>
-          <span class="fee-col-val">${formatINR(hostel)}</span>
+          <span class="fee-col-val">${hostel === null ? 'Check source' : formatINR(hostel)}</span>
         </div>
         <div class="fee-col-item">
           <span class="fee-col-label">Scholarship Relief</span>
-          <span class="fee-col-val" style="color: var(--color-emerald);">- ${formatINR(scholarship)}</span>
+          <span class="fee-col-val" style="color: var(--color-emerald);">${scholarship === null ? 'Check source' : `- ${formatINR(scholarship)}`}</span>
         </div>
         <div class="fee-col-item">
           <span class="fee-col-label">Estimated Net Cost</span>
-          <span class="fee-col-val net-highlight">${formatINR(netCost)}/yr</span>
+          <span class="fee-col-val net-highlight">${netCost === null ? 'Not extracted' : `${formatINR(netCost)}/yr`}</span>
         </div>
-      </div>
+      </div>`}
 
       <div class="card-footer-actions">
-        <span class="badge-affordability ${badgeClass}">${tierName}</span>
+        ${isSourceLead ? '' : `<span class="badge-affordability ${badgeClass}">${tierName}</span>`}
         <div style="display:flex; gap:0.4rem; align-items:center;">
           <button class="btn-compare-card ${isCompared ? 'selected' : ''}" data-cid="${collegeId}">
             ${isCompared ? '✓ Comparing' : '⚖️ Compare'}
@@ -1840,16 +2002,20 @@ function renderColleges() {
         <summary>Analysis, data notes & sources</summary>
         <div class="college-analysis-content">
           ${fallbackNotice ? `<p class="college-data-warning">${fallbackNotice}</p>` : ''}
-          <p><strong>Match:</strong> ${Math.abs(Number(diff))}%ile ${Number(diff) >= 0 ? 'above' : 'below'} the local estimate. The Dream / Realistic / Safe tier is a heuristic, not an admission probability.</p>
+          <p><strong>Match:</strong> ${isSourceLead ? 'This is a search lead, not a confirmed institution match or score eligibility decision.' : `${Math.abs(Number(diff))}%ile ${Number(diff) >= 0 ? 'above' : 'below'} the local estimate. The Dream / Realistic / Safe tier is a heuristic, not an admission probability.`}</p>
           <p><strong>Quota:</strong> ${isHs ? 'Your home state matches this institution; actual seat allocation depends on the current counselling rules and seat matrix.' : 'No home-state match indicated for this profile.'}</p>
           <p><strong>Branches in local dataset:</strong> ${escapeHtml((c.availableBranches || []).join(', ') || 'Not available')}</p>
-          <p><strong>Data quality:</strong> Fees, NIRF rank and cutoff values are seeded estimates and have not been verified from the linked pages. Cutoff comparison uses percentile data and is not an official JoSAA closing rank.</p>
+          <p><strong>Data quality:</strong> ${isSourceLead ? 'This source was discovered by an exam-specific search. Score-based eligibility, fees, and cutoffs have not been verified.' : 'Fees, NIRF rank and cutoff values are seeded estimates and have not been verified from the linked pages. Cutoff comparison uses percentile data and is not an official JoSAA closing rank.'}</p>
           <p><strong>Latest scrape:</strong> ${c.dataUpdatedAt ? escapeHtml(new Date(c.dataUpdatedAt).toLocaleString()) : 'No scrape timestamp available'}</p>
           <p><strong>Scraped references (discovery links, not fact verification):</strong></p>
           ${referenceMarkup}
         </div>
       </details>
     `;
+
+    if (isSourceLead) {
+      card.querySelectorAll('.btn-compare-card, .btn-why-match').forEach(button => button.remove());
+    }
 
     container.appendChild(card);
   });
@@ -1877,8 +2043,14 @@ function renderColleges() {
 function updateTierTip() {
   const tipText = document.getElementById('tierTipText');
   if (!tipText) return;
+  if (state.collegeData?.dataSource === 'Exam-specific admissions source discovery') {
+    tipText.textContent = 'These are admissions source leads for your selected exam, not confirmed colleges or score-based eligibility matches. Open each official source to check the current course criteria.';
+    return;
+  }
   const current = state.currentTier.toLowerCase();
-  if (current === 'realistic') {
+  if (current === 'all') {
+    tipText.textContent = 'Showing all institutions matching your criteria across Realistic, Safe, and Dream categories. Private universities offer direct/institutional application options within your budget.';
+  } else if (current === 'realistic') {
     tipText.textContent = 'Realistic matches are heuristic comparisons against locally seeded percentile estimates, not admission probabilities. Verify current cutoffs with the counselling authority.';
   } else if (current === 'dream') {
     tipText.textContent = 'Dream matches are below the local percentile estimate. They are not predictions of late-round or CSAB outcomes; check official round-wise closing ranks.';
@@ -2023,7 +2195,7 @@ function populateCalculatorDropdown() {
     ...(tiers.REALISTIC || tiers.realistic || []),
     ...(tiers.SAFE || tiers.safe || []),
     ...(tiers.DREAM || tiers.dream || [])
-  ];
+  ].filter(c => Number.isFinite(c.effectiveCutoff) || Number.isFinite(c.affordability?.estimatedNetCost));
 
   select.innerHTML = '';
   allColleges.forEach(c => {
@@ -2107,11 +2279,11 @@ async function loadAlternatives() {
       const card = document.createElement('div');
       card.className = 'pathway-card';
       card.innerHTML = `
-        <div class="pathway-tag">${p.planTag}</div>
-        <h4 class="pathway-college">${p.collegeName}</h4>
-        <div class="pathway-branch">Branch: <strong>${p.branch}</strong></div>
-        <div class="pathway-reason">${p.reason}</div>
-        <div class="pathway-cost">Estimated Annual Net Cost: <strong>${formatINR(p.annualCost)}/yr</strong></div>
+        <div class="pathway-tag">${escapeHtml(p.planTag)}</div>
+        <h4 class="pathway-college">${escapeHtml(p.collegeName)}</h4>
+        <div class="pathway-branch">Branch: <strong>${escapeHtml(p.branch)}</strong></div>
+        <div class="pathway-reason">${escapeHtml(p.reason)}</div>
+        <div class="pathway-cost">Estimated Annual Cost Before Aid: <strong>${formatINR(p.annualCost)}/yr</strong></div>
       `;
       container.appendChild(card);
     });
@@ -2313,11 +2485,20 @@ async function loadProfile() {
 
 function populateProfileForm(s) {
   if (!s) return;
+  const examEl = document.getElementById('inputExam');
+  if (examEl) examEl.value = s.entranceExam || 'JEE_MAIN';
+  const otherExamEl = document.getElementById('inputOtherExam');
+  if (otherExamEl) otherExamEl.value = s.otherExamName || '';
+  const studyAreaEl = document.getElementById('inputStudyArea');
+  if (studyAreaEl) studyAreaEl.value = s.studyArea || 'engineering';
   const nameEl = document.getElementById('inputName');
   if (nameEl) nameEl.value = s.name || '';
 
   const pctEl = document.getElementById('inputPercentile');
-  if (pctEl) pctEl.value = s.jeePercentile ?? '';
+  if (pctEl) pctEl.value = s.examScore ?? s.jeePercentile ?? '';
+  const neetRankEl = document.getElementById('inputNeetRank');
+  if (neetRankEl) neetRankEl.value = s.neetRank ?? '';
+  updateExamScoreFields();
 
   const catEl = document.getElementById('inputCategory');
   if (catEl) catEl.value = s.category ?? 'OBC-NCL';
@@ -2338,20 +2519,32 @@ function populateProfileForm(s) {
 function updateHeroSummary(s) {
   if (!s) return;
   const heroPill = document.getElementById('heroPillText');
-  if (heroPill) {
-    heroPill.textContent = `Active Student: ${s.name} (${s.state} · ${s.category} · ${Number(s.jeePercentile).toFixed(1)}%ile)`;
-  }
+  if (!heroPill) return;
+  const exam = s.entranceExam || 'JEE_MAIN';
+  const examName = exam === 'OTHER'
+    ? (s.otherExamName || 'Other exam')
+    : (document.querySelector(`#inputExam option[value="${exam}"]`)?.textContent || 'JEE Main');
+  const score = s.examScore ?? s.jeePercentile;
+  const scoreText = exam === 'JEE_MAIN' ? `${Number(score).toFixed(1)}%ile` : `${score ?? 'score not entered'}`;
+  heroPill.textContent = `Active Student: ${s.name} (${examName}: ${scoreText} · ${s.state} · ${s.category})`;
 }
-
 async function saveProfile() {
   if (!state.currentUser) {
     openAuthGate();
     return;
   }
 
+  const entranceExam = document.getElementById('inputExam')?.value || 'JEE_MAIN';
+  const examScore = Number(document.getElementById('inputPercentile')?.value);
+  const neetRankValue = document.getElementById('inputNeetRank')?.value?.trim();
   const s = {
     name: document.getElementById('inputName')?.value || 'Asha Kumar',
-    jeePercentile: Number(document.getElementById('inputPercentile')?.value),
+    entranceExam,
+    examScore,
+    neetRank: entranceExam === 'NEET_UG' && neetRankValue ? Number(neetRankValue) : null,
+    otherExamName: document.getElementById('inputOtherExam')?.value?.trim() || '',
+    studyArea: document.getElementById('inputStudyArea')?.value || 'engineering',
+    jeePercentile: entranceExam === 'JEE_MAIN' ? examScore : null,
     category: document.getElementById('inputCategory')?.value || 'OBC-NCL',
     state: document.getElementById('inputState')?.value || 'Jharkhand',
     preferredBranch: document.getElementById('inputBranch')?.value || 'CSE',
@@ -2361,6 +2554,7 @@ async function saveProfile() {
 
   if (state.currentUser) {
     sessionStorage.setItem(`fgn-pending-profile:${state.currentUser.id}`, JSON.stringify(s));
+    localStorage.setItem(`fgn-profile:${state.currentUser.id}`, JSON.stringify(s));
   }
 
   try {
@@ -2370,11 +2564,29 @@ async function saveProfile() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(s)
     });
-    if (!response.ok) throw new Error('Could not update your profile.');
+    const profileApiSource = response.headers.get('X-FGN-API-Source');
+    if (profileApiSource !== 'local-proxy-profile-v1') {
+      const body = await response.json().catch(() => ({}));
+      console.error('Profile API response came from an unexpected server.', {
+        url: response.url,
+        status: response.status,
+        apiSource: profileApiSource,
+        body
+      });
+      throw new Error(`Profile API mismatch (HTTP ${response.status}, source ${profileApiSource || 'unidentified'}). Restart the local app server and try again.`);
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Could not update your profile.');
+    }
 
     if (state.currentUser && window.FGNDB) {
       const { error } = await window.FGNDB.upsertProfile(state.currentUser.id, s);
-      if (error) throw error;
+      if (error) {
+        // The API profile was already saved above. Supabase is a secondary
+        // cross-device copy and must not prevent the student from continuing.
+        console.warn('Could not mirror profile to Supabase:', error.message || error);
+      }
     }
     if (state.currentUser) sessionStorage.removeItem(`fgn-pending-profile:${state.currentUser.id}`);
 
@@ -2410,10 +2622,25 @@ function getSavedPendingProfile(userId) {
   return null;
 }
 
+function getLocalSavedProfile(userId) {
+  try {
+    const serialized = localStorage.getItem(`fgn-profile:${userId}`);
+    const profile = serialized ? JSON.parse(serialized) : null;
+    return profile && typeof profile === 'object' && !Array.isArray(profile) ? profile : null;
+  } catch (error) {
+    console.warn('Could not restore the local profile copy:', error);
+    return null;
+  }
+}
+
 function setPreset(name, pct, cat, st, inc, br, bud, btnId) {
   document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
   const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('active');
+
+  const examEl = document.getElementById('inputExam');
+  if (examEl) examEl.value = 'JEE_MAIN';
+  updateExamScoreFields(true);
 
   const nameEl = document.getElementById('inputName');
   if (nameEl) nameEl.value = name;
@@ -2743,6 +2970,11 @@ async function syncProfileFromSupabase(userId = state.currentUser?.id) {
   if (data) {
     state.student = {
       name: data.name,
+      entranceExam: data.entrance_exam || 'JEE_MAIN',
+      examScore: data.exam_score ?? data.jee_percentile,
+      neetRank: data.neet_rank,
+      otherExamName: data.other_exam_name || '',
+      studyArea: data.study_area || 'engineering',
       jeePercentile: data.jee_percentile,
       category: data.category,
       state: data.state,

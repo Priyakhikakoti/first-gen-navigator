@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
   id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name            TEXT,
+  entrance_exam   TEXT DEFAULT 'JEE_MAIN',
+  exam_score      NUMERIC,
+  neet_rank       BIGINT,
+  other_exam_name TEXT,
+  study_area      TEXT DEFAULT 'engineering',
   jee_percentile  NUMERIC(5,2),
   category        TEXT CHECK (category IN ('GEN','OBC-NCL','EWS','SC','ST')),
   state           TEXT,
@@ -21,6 +26,12 @@ CREATE TABLE IF NOT EXISTS public.student_profiles (
   updated_at      TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id)
 );
+
+ALTER TABLE public.student_profiles ADD COLUMN IF NOT EXISTS entrance_exam TEXT DEFAULT 'JEE_MAIN';
+ALTER TABLE public.student_profiles ADD COLUMN IF NOT EXISTS exam_score NUMERIC;
+ALTER TABLE public.student_profiles ADD COLUMN IF NOT EXISTS neet_rank BIGINT;
+ALTER TABLE public.student_profiles ADD COLUMN IF NOT EXISTS other_exam_name TEXT;
+ALTER TABLE public.student_profiles ADD COLUMN IF NOT EXISTS study_area TEXT DEFAULT 'engineering';
 
 ALTER TABLE public.student_profiles ENABLE ROW LEVEL SECURITY;
 

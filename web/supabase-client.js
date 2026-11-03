@@ -33,7 +33,12 @@ async function dbUpsertProfile(userId, p) {
   return await _supabase.from('student_profiles').upsert({
     user_id: userId,
     name: p.name,
-    jee_percentile: Number(p.jeePercentile),
+    entrance_exam: p.entranceExam || 'JEE_MAIN',
+    exam_score: p.examScore !== null && p.examScore !== '' && Number.isFinite(Number(p.examScore)) ? Number(p.examScore) : null,
+    neet_rank: p.neetRank !== null && p.neetRank !== '' && Number.isFinite(Number(p.neetRank)) ? Number(p.neetRank) : null,
+    other_exam_name: p.otherExamName || null,
+    study_area: p.studyArea || 'engineering',
+    jee_percentile: p.entranceExam === 'JEE_MAIN' ? Number(p.jeePercentile) : null,
     category: p.category,
     state: p.state,
     preferred_branch: p.preferredBranch,
@@ -70,7 +75,7 @@ _supabase.auth.onAuthStateChange((event, session) => {
 });
 
 // ─── Expose globally ───────────────────────────────────────────────────────────
-window.FGNAuth = { signUp, signIn, signOut, getSession, getUser, getAccessToken, client: _supabase };
+window.FGNAuth = { signUp, signIn, signOut, getSession, getUser, getAccessToken, apiKey: SUPABASE_ANON_KEY, client: _supabase };
 window.FGNDB = { getProfile: dbGetProfile, upsertProfile: dbUpsertProfile, getDocuments: dbGetDocuments, upsertDocument: dbUpsertDocument, getProgress: dbGetProgress, updateProgress: dbUpdateProgress };
 
 console.log('[FGN] Supabase client ready.');
